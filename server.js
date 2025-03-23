@@ -16,24 +16,13 @@ const PORT = process.env.PORT || 5000
 app.use(express.json({ limit: "30mb" }))
 app.use(express.urlencoded({ limit: "30mb", extended: true }))
 
-// Configure CORS - Updated to be more permissive for development
+// Configure CORS - Simplified to allow all origins in development
 app.use(
   cors({
-    origin: (origin, callback) => {
-      // Allow requests with no origin (like mobile apps, curl requests)
-      // Or allow any origin in development mode
-      const allowedOrigins = ["http://localhost:3000", "https://hsst-alumni.vercel.app"]
-
-      if (!origin || allowedOrigins.indexOf(origin) !== -1) {
-        callback(null, true)
-      } else {
-        console.log("Origin not allowed by CORS:", origin)
-        callback(null, true) // Allow anyway for testing
-      }
-    },
-    credentials: true,
+    origin: "*", // Allow all origins in development
     methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization"],
+    credentials: false, // Set to false to avoid preflight issues
   }),
 )
 
@@ -42,46 +31,43 @@ app.get("/", (req, res) => {
   res.send("HSST Alumni API is running")
 })
 
+// Add a health check endpoint
+app.get("/health", (req, res) => {
+  res.status(200).json({ status: "ok", message: "Server is running" })
+})
+
 // Routes
 app.use("/api/auth", authRoutes)
 app.use("/api/alumni", alumniRoutes)
 app.use("/api/contact", contactRoutes)
 app.use("/api/academic-units", academicUnitRoutes)
 
-// Improved MongoDB connection with retry logic
-const connectToMongoDB = async (retryCount = 5, delay = 5000) => {
-  let currentTry = 0
-
-  while (currentTry < retryCount) {
-    try {
-      const connection = await mongoose.connect(process.env.MONGODB_URI, {
-      })
-
-      console.log(`MongoDB connected successfully! host: ${connection.connection.host}`)
-      return true
-    } catch (error) {
-      currentTry++
-      console.error(`MongoDB connection attempt ${currentTry} failed:`, error.message)
-
-      if (currentTry >= retryCount) {
-        console.error("Maximum retry attempts reached. Exiting...")
-        process.exit(1)
-      }
-
-      console.log(`Retrying in ${delay / 1000} seconds...`)
-      await new Promise((resolve) => setTimeout(resolve, delay))
-    }
+// Improved MongoDB connection with better error handling
+const connectToMongoDB = async () => {
+  try {
+    await mongoose.connect(process.env.MONGODB_URI)
+    console.log(`MongoDB connected successfully! host: ${mongoose.connection.host}`)
+    return true
+  } catch (error) {
+    console.error("MongoDB connection error:", error.message)
+    return false
   }
+}
+
+// Start server regardless of MongoDB connection status
+const startServer = () => {
+  app.listen(PORT, () => {
+    console.log(`Server running on port: http://localhost:${PORT}`)
+  })
 }
 
 // Connect to MongoDB and start server
 connectToMongoDB()
-  .then(() => {
-    app.listen(PORT, () => console.log(`Server running on port: http://localhost:${PORT}`))
-  })
+  .then(startServer)
   .catch((error) => {
-    console.error("Failed to start the server:", error)
-    process.exit(1)
+    console.error("Failed to connect to MongoDB:", error)
+    // Start server anyway so we can at least serve the API
+    startServer()
   })
 
 // Handle unexpected errors
@@ -91,6 +77,6 @@ process.on("unhandledRejection", (error) => {
 
 process.on("uncaughtException", (error) => {
   console.error("Uncaught Exception:", error)
-  process.exit(1)
+  // Don't exit the process, just log the error
 })
 
