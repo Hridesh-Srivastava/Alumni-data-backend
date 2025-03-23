@@ -1,163 +1,269 @@
-import Alumni from '../models/alumni.js';
+import Alumni from "../models/alumni.js"
 
-// @desc    Create a new alumni record
-// @route   POST /api/alumni
-// @access  Private
-export const createAlumni = async (req, res) => {
-  try {
-    const alumniData = req.body;
-    
-    // Check if alumni with registration number already exists
-    const alumniExists = await Alumni.findOne({ 
-      registrationNumber: alumniData.registrationNumber 
-    });
-    
-    if (alumniExists) {
-      return res.status(400).json({ 
-        message: 'Alumni with this registration number already exists' 
-      });
-    }
-    
-    const newAlumni = new Alumni({
-      ...alumniData,
-      createdAt: new Date(),
-      updatedAt: new Date()
-    });
-    
-    await newAlumni.save();
-    
-    res.status(201).json(newAlumni);
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
-};
-
-// @desc    Get all alumni records with pagination
+// @desc    Get all alumni
 // @route   GET /api/alumni
-// @access  Private
+// @access  Private/Admin
 export const getAlumni = async (req, res) => {
   try {
-    const { page = 1, limit = 10, academicUnit } = req.query;
-    
-    const query = academicUnit ? { academicUnit } : {};
-    
-    const options = {
-      page: parseInt(page, 10),
-      limit: parseInt(limit, 10),
-      sort: { createdAt: -1 }
-    };
-    
-    const alumni = await Alumni.find(query)
-      .limit(options.limit)
-      .skip((options.page - 1) * options.limit)
-      .sort(options.sort);
-      
-    const total = await Alumni.countDocuments(query);
-    
-    res.status(200).json({
-      alumni,
-      totalPages: Math.ceil(total / options.limit),
-      currentPage: options.page,
-      total
-    });
+    const pageSize = Number(req.query.limit) || 10
+    const page = Number(req.query.page) || 1
+
+    const filter = {}
+
+    if (req.query.academicUnit && req.query.academicUnit !== "all") {
+      filter.academicUnit = req.query.academicUnit
+    }
+
+    if (req.query.passingYear && req.query.passingYear !== "all") {
+      filter.passingYear = req.query.passingYear
+    }
+
+    if (req.query.program) {
+      filter.program = { $regex: req.query.program, $options: "i" }
+    }
+
+    const count = await Alumni.countDocuments(filter)
+    const alumni = await Alumni.find(filter)
+      .limit(pageSize)
+      .skip(pageSize * (page - 1))
+      .sort({ createdAt: -1 })
+
+    res.json({
+      data: alumni,
+      pagination: {
+        total: count,
+        page,
+        limit: pageSize,
+        totalPages: Math.ceil(count / pageSize),
+      },
+    })
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    console.error("Get alumni error:", error)
+    res.status(500).json({ message: "Server error fetching alumni" })
   }
-};
+}
 
 // @desc    Get alumni by ID
 // @route   GET /api/alumni/:id
-// @access  Private
+// @access  Private/Admin
 export const getAlumniById = async (req, res) => {
   try {
-    const { id } = req.params;
-    
-    const alumni = await Alumni.findById(id);
-    
-    if (!alumni) {
-      return res.status(404).json({ message: 'Alumni not found' });
-    }
-    
-    res.status(200).json(alumni);
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
-};
+    const alumni = await Alumni.findById(req.params.id)
 
-// @desc    Update alumni record
+    if (alumni) {
+      res.json(alumni)
+    } else {
+      res.status(404).json({ message: "Alumni not found" })
+    }
+  } catch (error) {
+    console.error("Get alumni by ID error:", error)
+    res.status(500).json({ message: "Server error fetching alumni" })
+  }
+}
+
+// @desc    Create a new alumni
+// @route   POST /api/alumni
+// @access  Private/Admin
+export const createAlumni = async (req, res) => {
+  try {
+    const {
+      name,
+      academicUnit,
+      program,
+      passingYear,
+      registrationNumber,
+      qualifiedExams,
+      employment,
+      higherEducation,
+      contactDetails,
+    } = req.body
+
+    const alumniExists = await Alumni.findOne({ registrationNumber })
+
+    if (alumniExists) {
+      return res.status(400).json({ message: "Alumni with this registration number already exists" })
+    }
+
+    const alumni = await Alumni.create({
+      name,
+      academicUnit,
+      program,
+      passingYear,
+      registrationNumber,
+      qualifiedExams,
+      employment,
+      higherEducation,
+      contactDetails,
+    })
+
+    if (alumni) {
+      res.status(201).json(alumni)
+    } else {
+      res.status(400).json({ message: "Invalid alumni data" })
+    }
+  } catch (error) {
+    console.error("Create alumni error:", error)
+    res.status(500).json({ message: "Server error creating alumni" })
+  }
+}
+
+// @desc    Update an alumni
 // @route   PUT /api/alumni/:id
-// @access  Private
+// @access  Private/Admin
 export const updateAlumni = async (req, res) => {
   try {
-    const { id } = req.params;
-    const updates = req.body;
-    
-    const alumni = await Alumni.findById(id);
-    
-    if (!alumni) {
-      return res.status(404).json({ message: 'Alumni not found' });
-    }
-    
-    const updatedAlumni = await Alumni.findByIdAndUpdate(
-      id, 
-      { ...updates, updatedAt: new Date() },
-      { new: true }
-    );
-    
-    res.status(200).json(updatedAlumni);
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
-};
+    const alumni = await Alumni.findById(req.params.id)
 
-// @desc    Delete alumni record
+    if (alumni) {
+      alumni.name = req.body.name || alumni.name
+      alumni.academicUnit = req.body.academicUnit || alumni.academicUnit
+      alumni.program = req.body.program || alumni.program
+      alumni.passingYear = req.body.passingYear || alumni.passingYear
+      alumni.registrationNumber = req.body.registrationNumber || alumni.registrationNumber
+
+      if (req.body.qualifiedExams) {
+        alumni.qualifiedExams = req.body.qualifiedExams
+      }
+
+      if (req.body.employment) {
+        alumni.employment = req.body.employment
+      }
+
+      if (req.body.higherEducation) {
+        alumni.higherEducation = req.body.higherEducation
+      }
+
+      if (req.body.contactDetails) {
+        alumni.contactDetails = req.body.contactDetails
+      }
+
+      const updatedAlumni = await alumni.save()
+      res.json(updatedAlumni)
+    } else {
+      res.status(404).json({ message: "Alumni not found" })
+    }
+  } catch (error) {
+    console.error("Update alumni error:", error)
+    res.status(500).json({ message: "Server error updating alumni" })
+  }
+}
+
+// @desc    Delete an alumni
 // @route   DELETE /api/alumni/:id
-// @access  Private
+// @access  Private/Admin
 export const deleteAlumni = async (req, res) => {
   try {
-    const { id } = req.params;
-    
-    const alumni = await Alumni.findById(id);
-    
-    if (!alumni) {
-      return res.status(404).json({ message: 'Alumni not found' });
-    }
-    
-    await Alumni.findByIdAndDelete(id);
-    
-    res.status(200).json({ message: 'Alumni deleted successfully' });
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
-};
+    const alumni = await Alumni.findById(req.params.id)
 
-// @desc    Search alumni records
+    if (alumni) {
+      await alumni.deleteOne()
+      res.json({ message: "Alumni removed" })
+    } else {
+      res.status(404).json({ message: "Alumni not found" })
+    }
+  } catch (error) {
+    console.error("Delete alumni error:", error)
+    res.status(500).json({ message: "Server error deleting alumni" })
+  }
+}
+
+// @desc    Search alumni
 // @route   GET /api/alumni/search
-// @access  Private
+// @access  Private/Admin
 export const searchAlumni = async (req, res) => {
   try {
-    const { query, academicUnit } = req.query;
-    
-    if (!query) {
-      return res.status(400).json({ message: 'Search query is required' });
-    }
-    
-    const searchQuery = {
+    const { query, academicUnit } = req.query
+
+    const filter = {
       $or: [
-        { name: { $regex: query, $options: 'i' } },
-        { registrationNumber: { $regex: query, $options: 'i' } },
-        { program: { $regex: query, $options: 'i' } }
-      ]
-    };
-    
-    if (academicUnit) {
-      searchQuery.academicUnit = academicUnit;
+        { name: { $regex: query, $options: "i" } },
+        { registrationNumber: { $regex: query, $options: "i" } },
+        { program: { $regex: query, $options: "i" } },
+      ],
     }
-    
-    const alumni = await Alumni.find(searchQuery).limit(20);
-    
-    res.status(200).json(alumni);
+
+    if (academicUnit && academicUnit !== "all") {
+      filter.academicUnit = academicUnit
+    }
+
+    const alumni = await Alumni.find(filter).limit(20)
+
+    res.json(alumni)
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    console.error("Search alumni error:", error)
+    res.status(500).json({ message: "Server error searching alumni" })
   }
-};
+}
+
+// @desc    Get alumni statistics
+// @route   GET /api/alumni/stats
+// @access  Private/Admin
+export const getAlumniStats = async (req, res) => {
+  try {
+    // Total alumni count
+    const totalAlumni = await Alumni.countDocuments()
+
+    // Count by academic unit
+    const byAcademicUnit = await Alumni.aggregate([
+      {
+        $group: {
+          _id: "$academicUnit",
+          count: { $sum: 1 },
+        },
+      },
+    ])
+
+    // Format academic unit data
+    const academicUnitData = {}
+    byAcademicUnit.forEach((item) => {
+      academicUnitData[item._id] = item.count
+    })
+
+    // Count by passing year
+    const byPassingYear = await Alumni.aggregate([
+      {
+        $group: {
+          _id: "$passingYear",
+          count: { $sum: 1 },
+        },
+      },
+      {
+        $sort: { _id: 1 },
+      },
+    ])
+
+    // Format passing year data
+    const passingYearData = {}
+    byPassingYear.forEach((item) => {
+      passingYearData[item._id] = item.count
+    })
+
+    // Count employed alumni
+    const employedCount = await Alumni.countDocuments({
+      "employment.type": "Employed",
+    })
+
+    // Calculate employment rate
+    const employmentRate = totalAlumni > 0 ? Math.round((employedCount / totalAlumni) * 100) : 0
+
+    // Count alumni pursuing higher education
+    const higherEducationCount = await Alumni.countDocuments({
+      "higherEducation.institutionName": { $exists: true, $ne: "" },
+    })
+
+    // Calculate higher education rate
+    const higherEducationRate = totalAlumni > 0 ? Math.round((higherEducationCount / totalAlumni) * 100) : 0
+
+    res.json({
+      totalAlumni,
+      byAcademicUnit: academicUnitData,
+      byPassingYear: passingYearData,
+      employmentRate,
+      higherEducationRate,
+    })
+  } catch (error) {
+    console.error("Get alumni stats error:", error)
+    res.status(500).json({ message: "Server error fetching alumni statistics" })
+  }
+}
+

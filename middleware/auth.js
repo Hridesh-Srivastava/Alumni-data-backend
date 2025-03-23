@@ -1,47 +1,40 @@
-import jwt from 'jsonwebtoken';
-import User from '../models/user.js';
+import jwt from "jsonwebtoken"
+import User from "../models/user.js"
 
+// Middleware to protect routes
 export const protect = async (req, res, next) => {
-  let token;
+  let token
 
-  if (
-    req.headers.authorization &&
-    req.headers.authorization.startsWith('Bearer')
-  ) {
+  // Check if token exists in headers
+  if (req.headers.authorization && req.headers.authorization.startsWith("Bearer")) {
     try {
       // Get token from header
-      token = req.headers.authorization.split(' ')[1];
+      token = req.headers.authorization.split(" ")[1]
 
       // Verify token
-      const decoded = jwt.verify(token, process.env.JWT_SECRET);
+      const decoded = jwt.verify(token, process.env.JWT_SECRET)
 
       // Get user from the token
-      req.user = await User.findById(decoded.id).select('-password');
+      req.user = await User.findById(decoded.id).select("-password")
 
-      next();
+      next()
     } catch (error) {
-      console.error(error);
-      res.status(401).json({ message: 'Not authorized, token failed' });
+      console.error("Auth middleware error:", error)
+      res.status(401).json({ message: "Not authorized, token failed" })
     }
   }
 
   if (!token) {
-    res.status(401).json({ message: 'Not authorized, no token' });
+    res.status(401).json({ message: "Not authorized, no token" })
   }
-};
+}
 
+// Middleware to check if user is admin
 export const admin = (req, res, next) => {
-  if (req.user && (req.user.role === 'admin' || req.user.role === 'superadmin')) {
-    next();
+  if (req.user && req.user.role === "admin") {
+    next()
   } else {
-    res.status(401).json({ message: 'Not authorized as an admin' });
+    res.status(401).json({ message: "Not authorized as an admin" })
   }
-};
+}
 
-export const superAdmin = (req, res, next) => {
-  if (req.user && req.user.role === 'superadmin') {
-    next();
-  } else {
-    res.status(401).json({ message: 'Not authorized as a super admin' });
-  }
-};
