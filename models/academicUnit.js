@@ -1,27 +1,28 @@
 import mongoose from "mongoose"
 
-const academicUnitSchema = mongoose.Schema(
-  {
-    name: {
-      type: String,
-      required: true,
-      unique: true,
-    },
-    shortName: {
-      type: String,
-      required: true,
-    },
-    description: {
-      type: String,
-      required: true,
-    },
+const AcademicUnitSchema = new mongoose.Schema({
+  name: {
+    type: String,
+    required: true,
+    unique: true,
   },
-  {
-    timestamps: true,
+  shortName: {
+    type: String,
+    required: true,
   },
-)
+  description: {
+    type: String,
+  },
+  createdAt: {
+    type: Date,
+    default: Date.now,
+  },
+  updatedAt: {
+    type: Date,
+  },
+})
 
-const AcademicUnit = mongoose.model("AcademicUnit", academicUnitSchema)
+const AcademicUnit = mongoose.model("AcademicUnit", AcademicUnitSchema)
 
 export default AcademicUnit
 

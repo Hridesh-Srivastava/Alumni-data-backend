@@ -1,39 +1,35 @@
 import jwt from "jsonwebtoken";
-import User from "../models/user.js";
 
-// Middleware to protect routes
-export const protect = async (req, res, next) => {
-  let token;
+// Middleware to verify JWT token
+const protect = (req, res, next) => {
+  // Get token from header
+  const token = req.header("Authorization")?.replace("Bearer ", "");
 
-  // Check if token exists in headers
-  if (req.headers.authorization && req.headers.authorization.startsWith("Bearer")) {
-    try {
-      // Get token from header
-      token = req.headers.authorization.split(" ")[1];
-
-      // Verify token
-      const decoded = jwt.verify(token, process.env.JWT_SECRET);
-
-      // Get user from the token
-      req.user = await User.findById(decoded.id).select("-password");
-
-      next();
-    } catch (error) {
-      console.error("Auth middleware error:", error);
-      res.status(401).json({ message: "Not authorized, token failed" });
-    }
+  // Check if no token
+  if (!token) {
+    return res.status(401).json({ message: "No token, authorization denied" });
   }
 
-  if (!token) {
-    res.status(401).json({ message: "Not authorized, no token" });
+  try {
+    // Verify token
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+
+    // Add user from payload
+    req.user = decoded.user;
+    next();
+  } catch (error) {
+    console.error("Token verification error:", error);
+    res.status(401).json({ message: "Token is not valid" });
   }
 };
 
 // Middleware to check if user is admin
-export const admin = (req, res, next) => {
+const admin = (req, res, next) => {
   if (req.user && req.user.role === "admin") {
     next();
   } else {
     res.status(401).json({ message: "Not authorized as an admin" });
   }
 };
+
+export { protect, admin };
