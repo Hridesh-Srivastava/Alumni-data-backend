@@ -1,57 +1,95 @@
 import mongoose from "mongoose"
 
-const alumniSchema = mongoose.Schema(
-  {
-    name: {
+const AlumniSchema = new mongoose.Schema({
+  name: {
+    type: String,
+    required: true,
+  },
+  academicUnit: {
+    type: String,
+    required: true,
+  },
+  program: {
+    type: String,
+    required: true,
+  },
+  passingYear: {
+    type: String,
+    required: true,
+  },
+  registrationNumber: {
+    type: String,
+    required: true,
+    unique: true,
+  },
+  contactDetails: {
+    email: {
       type: String,
-      required: true,
     },
-    academicUnit: {
+    phone: {
       type: String,
-      required: true,
     },
-    program: {
+    address: {
       type: String,
-      required: true,
-    },
-    passingYear: {
-      type: String,
-      required: true,
-    },
-    registrationNumber: {
-      type: String,
-      required: true,
-      unique: true,
-    },
-    qualifiedExams: {
-      examName: String,
-      rollNumber: String,
-      certificateUrl: String,
-    },
-    employment: {
-      type: String,
-      employerName: String,
-      employerContact: String,
-      employerEmail: String,
-      documentUrl: String,
-    },
-    higherEducation: {
-      institutionName: String,
-      programName: String,
-      documentUrl: String,
-    },
-    contactDetails: {
-      email: String,
-      phone: String,
-      address: String,
     },
   },
-  {
-    timestamps: true,
+  qualifiedExams: {
+    examName: {
+      type: String,
+    },
+    rollNumber: {
+      type: String,
+    },
+    certificateUrl: {
+      type: String,
+    },
   },
-)
+  employment: {
+    type: {
+      type: String,
+      enum: ["Employed", "Self-employed", "Unemployed", "Studying", ""],
+    },
+    employerName: {
+      type: String,
+    },
+    employerContact: {
+      type: String,
+    },
+    employerEmail: {
+      type: String,
+    },
+    documentUrl: {
+      type: String,
+    },
+    selfEmploymentDetails: {
+      type: String,
+    },
+  },
+  higherEducation: {
+    institutionName: {
+      type: String,
+    },
+    programName: {
+      type: String,
+    },
+    documentUrl: {
+      type: String,
+    },
+  },
+  createdBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "User",
+  },
+  createdAt: {
+    type: Date,
+    default: Date.now,
+  },
+  updatedAt: {
+    type: Date,
+  },
+})
 
-const Alumni = mongoose.model("Alumni", alumniSchema)
+const Alumni = mongoose.model("Alumni", AlumniSchema)
 
 export default Alumni
 

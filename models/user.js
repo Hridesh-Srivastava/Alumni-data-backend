@@ -1,82 +1,93 @@
 import mongoose from "mongoose"
 import bcrypt from "bcryptjs"
 
-const userSchema = mongoose.Schema(
-  {
-    name: {
-      type: String,
-      required: true,
-    },
-    email: {
-      type: String,
-      required: true,
-      unique: true,
-    },
-    password: {
-      type: String,
-      required: true,
-    },
-    role: {
-      type: String,
-      enum: ["user", "admin"],
-      default: "admin",
-    },
-    settings: {
-      notifications: {
-        email: {
-          type: Boolean,
-          default: true,
-        },
-        browser: {
-          type: Boolean,
-          default: false,
-        },
+const UserSchema = new mongoose.Schema({
+  name: {
+    type: String,
+    required: true,
+  },
+  email: {
+    type: String,
+    required: true,
+    unique: true,
+    lowercase: true,
+    trim: true,
+  },
+  password: {
+    type: String,
+    required: true,
+  },
+  role: {
+    type: String,
+    enum: ["admin", "user"],
+    default: "user",
+  },
+  resetToken: {
+    type: String,
+  },
+  resetTokenExpiry: {
+    type: Date,
+  },
+  settings: {
+    notifications: {
+      email: {
+        type: Boolean,
+        default: true,
       },
-      privacy: {
-        showEmail: {
-          type: Boolean,
-          default: false,
-        },
-        showProfile: {
-          type: Boolean,
-          default: true,
-        },
+      browser: {
+        type: Boolean,
+        default: false,
       },
-      appearance: {
-        theme: {
-          type: String,
-          enum: ["light", "dark", "system"],
-          default: "system",
-        },
-        fontSize: {
-          type: String,
-          enum: ["small", "medium", "large"],
-          default: "medium",
-        },
+    },
+    privacy: {
+      showEmail: {
+        type: Boolean,
+        default: false,
+      },
+      showProfile: {
+        type: Boolean,
+        default: true,
+      },
+    },
+    appearance: {
+      theme: {
+        type: String,
+        default: "system",
+      },
+      fontSize: {
+        type: String,
+        default: "medium",
       },
     },
   },
-  {
-    timestamps: true,
+  createdAt: {
+    type: Date,
+    default: Date.now,
   },
-)
-
-// Match user entered password to hashed password in database
-userSchema.methods.matchPassword = async function (enteredPassword) {
-  return await bcrypt.compare(enteredPassword, this.password)
-}
-
-// Encrypt password before saving
-userSchema.pre("save", async function (next) {
-  if (!this.isModified("password")) {
-    next()
-  }
-
-  const salt = await bcrypt.genSalt(10)
-  this.password = await bcrypt.hash(this.password, salt)
 })
 
-const User = mongoose.model("User", userSchema)
+// Hash password before saving
+UserSchema.pre("save", async function (next) {
+  // Only hash the password if it has been modified (or is new)
+  if (!this.isModified("password")) return next()
+
+  try {
+    // Generate salt
+    const salt = await bcrypt.genSalt(10)
+    // Hash password
+    this.password = await bcrypt.hash(this.password, salt)
+    next()
+  } catch (error) {
+    next(error)
+  }
+})
+
+// Method to compare passwords
+UserSchema.methods.comparePassword = async function (candidatePassword) {
+  return await bcrypt.compare(candidatePassword, this.password)
+}
+
+const User = mongoose.model("User", UserSchema)
 
 export default User
 

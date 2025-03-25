@@ -10,14 +10,21 @@ import academicUnitRoutes from "./routes/academicUnit.js"
 dotenv.config()
 
 const app = express()
-const PORT = process.env.PORT || 5000
+const PORT = process.env.PORT || 5001
 
 // Middleware
 app.use(express.json({ limit: "30mb" }))
 app.use(express.urlencoded({ limit: "30mb", extended: true }))
 
-// IMPORTANT: Configure CORS properly - this is critical for frontend-backend communication
-app.use(cors()) // Allow all origins for now to troubleshoot
+// Configure CORS to allow requests from frontend
+app.use(
+  cors({
+    origin: process.env.FRONTEND_URL || "http://localhost:3000",
+    credentials: true,
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
+  }),
+)
 
 // Simple route to check if the server is running
 app.get("/", (req, res) => {
@@ -30,6 +37,7 @@ app.get("/health", (req, res) => {
     status: "ok",
     message: "Server is running",
     mongodb: mongoose.connection.readyState === 1 ? "connected" : "disconnected",
+    timestamp: new Date().toISOString(),
   })
 })
 
@@ -46,6 +54,12 @@ app.use((err, req, res, next) => {
     message: "Internal server error",
     error: process.env.NODE_ENV === "development" ? err.message : undefined,
   })
+})
+
+// Handle 404 errors for any undefined routes
+app.use((req, res) => {
+  console.log(`Route not found: ${req.method} ${req.originalUrl}`)
+  res.status(404).json({ message: `Route not found: ${req.method} ${req.originalUrl}` })
 })
 
 // Improved MongoDB connection with better error handling
@@ -67,7 +81,7 @@ const startServer = () => {
     // Listen on all network interfaces
     console.log(`Server running on port: http://localhost:${PORT}`)
     console.log(`Try accessing: http://127.0.0.1:${PORT}`)
-    console.log(`CORS is currently set to allow all origins for troubleshooting`)
+    console.log(`CORS is configured to allow requests from: ${process.env.FRONTEND_URL || "http://localhost:3000"}`)
   })
 
   // Handle server errors
