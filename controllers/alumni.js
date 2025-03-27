@@ -1,4 +1,4 @@
-import Alumni from "../models/alumni.js"
+import Alumni from "../models/alumni.js";
 
 // @desc    Get all alumni
 // @route   GET /api/alumni

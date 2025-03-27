@@ -196,10 +196,30 @@ router.put("/profile", protect, async (req, res) => {
     // Save user
     await user.save()
 
-    // Return user without password
-    const updatedUser = await User.findById(req.user.id).select("-password")
+    // Create a new token with updated user info
+    const payload = {
+      user: {
+        id: user.id,
+        role: user.role,
+      },
+    }
 
-    res.json(updatedUser)
+    // Sign token
+    jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: "24h" }, (err, token) => {
+      if (err) throw err
+
+      // Return user without password and with new token
+      const updatedUser = {
+        _id: user.id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        settings: user.settings,
+        token: token,
+      }
+
+      res.json(updatedUser)
+    })
   } catch (error) {
     console.error("Error in update profile:", error)
     res.status(500).json({ message: "Server error" })
@@ -213,6 +233,10 @@ router.put("/settings", protect, async (req, res) => {
   try {
     const { settings } = req.body
 
+    if (!settings) {
+      return res.status(400).json({ message: "Settings are required" })
+    }
+
     // Get user
     const user = await User.findById(req.user.id)
 
@@ -220,10 +244,29 @@ router.put("/settings", protect, async (req, res) => {
       return res.status(404).json({ message: "User not found" })
     }
 
-    // Update settings
+    // Update settings with deep merge
     user.settings = {
       ...user.settings,
       ...settings,
+      // Handle nested objects
+      notifications: settings.notifications
+        ? {
+            ...user.settings?.notifications,
+            ...settings.notifications,
+          }
+        : user.settings?.notifications,
+      privacy: settings.privacy
+        ? {
+            ...user.settings?.privacy,
+            ...settings.privacy,
+          }
+        : user.settings?.privacy,
+      appearance: settings.appearance
+        ? {
+            ...user.settings?.appearance,
+            ...settings.appearance,
+          }
+        : user.settings?.appearance,
     }
 
     // Save user

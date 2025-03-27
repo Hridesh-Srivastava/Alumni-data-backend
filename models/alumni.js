@@ -8,6 +8,7 @@ const AlumniSchema = new mongoose.Schema({
   academicUnit: {
     type: String,
     required: true,
+    default: "Himalayan School of Science and Technology", // Default to HSST
   },
   program: {
     type: String,
@@ -75,6 +76,10 @@ const AlumniSchema = new mongoose.Schema({
     documentUrl: {
       type: String,
     },
+  },
+  // New fields for file uploads
+  basicInfoImageUrl: {
+    type: String,
   },
   createdBy: {
     type: mongoose.Schema.Types.ObjectId,
