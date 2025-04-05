@@ -1,7 +1,7 @@
 import express from "express"
 import { check, validationResult } from "express-validator"
 import { protect } from "../middleware/auth.js"
-import AcademicUnit from "../models/AcademicUnit.js"
+import AcademicUnit from "../models/academicUnit.js"
 
 const router = express.Router()
 

@@ -101,15 +101,15 @@ async function runDiagnostics() {
   await checkFirewall()
 
   console.log("\x1b[36m\nTroubleshooting suggestions:\x1b[0m")
-  console.log("1. Try accessing your backend directly in the browser: http://localhost:5000")
-  console.log("2. Check if your firewall is blocking Node.js or port 5000")
+  console.log("1. Try accessing your backend directly in the browser: http://localhost:5001")
+  console.log("2. Check if your firewall is blocking Node.js or port 5001")
   console.log("3. Try changing the backend port in .env to 3001 or another free port")
   console.log("4. Make sure NEXT_PUBLIC_API_URL in frontend .env.local matches your backend URL")
   console.log("5. Try using 127.0.0.1 instead of localhost in your API URL")
 
   console.log("\x1b[36m\nTo fix the connection issue, try these steps:\x1b[0m")
   console.log("1. Update your frontend .env.local to use:")
-  console.log("   NEXT_PUBLIC_API_URL=http://127.0.0.1:5000/api")
+  console.log("   NEXT_PUBLIC_API_URL=http://127.0.0.1:5001/api")
   console.log("2. Restart both your backend and frontend servers")
   console.log("3. Temporarily disable your firewall for testing")
   console.log("4. If using a VPN, try disconnecting it")
