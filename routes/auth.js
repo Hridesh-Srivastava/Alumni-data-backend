@@ -2,7 +2,7 @@ import express from "express"
 import bcrypt from "bcryptjs"
 import jwt from "jsonwebtoken"
 import { check, validationResult } from "express-validator"
-import User from "../models/User.js"
+import User from "../models/user.js"
 import { protect } from "../middleware/auth.js"
 import nodemailer from "nodemailer"
 import crypto from "crypto"
@@ -43,12 +43,26 @@ router.post(
         return res.status(400).json({ message: "User already exists" })
       }
 
-      // Create new user
+      // Create new user with default settings structure
       user = new User({
         name,
         email,
         password,
         role: "admin", // Default role
+        settings: {
+          notifications: {
+            email: true,
+            browser: false,
+          },
+          privacy: {
+            showEmail: false,
+            showProfile: true,
+          },
+          appearance: {
+            theme: "system",
+            fontSize: "medium",
+          },
+        },
       })
 
       // Hash password
@@ -244,29 +258,53 @@ router.put("/settings", protect, async (req, res) => {
       return res.status(404).json({ message: "User not found" })
     }
 
+    // Initialize settings object if it doesn't exist
+    if (!user.settings) {
+      user.settings = {
+        notifications: {},
+        privacy: {},
+        appearance: {},
+      }
+    }
+
     // Update settings with deep merge
-    user.settings = {
-      ...user.settings,
-      ...settings,
-      // Handle nested objects
-      notifications: settings.notifications
-        ? {
-            ...user.settings?.notifications,
-            ...settings.notifications,
-          }
-        : user.settings?.notifications,
-      privacy: settings.privacy
-        ? {
-            ...user.settings?.privacy,
-            ...settings.privacy,
-          }
-        : user.settings?.privacy,
-      appearance: settings.appearance
-        ? {
-            ...user.settings?.appearance,
-            ...settings.appearance,
-          }
-        : user.settings?.appearance,
+    if (settings.notifications) {
+      // Initialize if doesn't exist
+      if (!user.settings.notifications) {
+        user.settings.notifications = {}
+      }
+      
+      // Update notifications settings
+      user.settings.notifications = {
+        ...user.settings.notifications,
+        ...settings.notifications,
+      }
+    }
+
+    if (settings.privacy) {
+      // Initialize if doesn't exist
+      if (!user.settings.privacy) {
+        user.settings.privacy = {}
+      }
+      
+      // Update privacy settings
+      user.settings.privacy = {
+        ...user.settings.privacy,
+        ...settings.privacy,
+      }
+    }
+
+    if (settings.appearance) {
+      // Initialize if doesn't exist
+      if (!user.settings.appearance) {
+        user.settings.appearance = {}
+      }
+      
+      // Update appearance settings
+      user.settings.appearance = {
+        ...user.settings.appearance,
+        ...settings.appearance,
+      }
     }
 
     // Save user
@@ -429,4 +467,3 @@ router.post(
 )
 
 export default router
-

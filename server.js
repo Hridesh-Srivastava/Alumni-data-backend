@@ -6,6 +6,7 @@ import authRoutes from "./routes/auth.js"
 import alumniRoutes from "./routes/alumni.js"
 import contactRoutes from "./routes/contact.js"
 import academicUnitRoutes from "./routes/academicUnit.js"
+import settingsRoutes from "./routes/settings.js"
 
 dotenv.config()
 
@@ -46,6 +47,7 @@ app.use("/api/auth", authRoutes)
 app.use("/api/alumni", alumniRoutes)
 app.use("/api/contact", contactRoutes)
 app.use("/api/academic-units", academicUnitRoutes)
+app.use("/api/settings", settingsRoutes)
 
 // Error handling middleware
 app.use((err, req, res, next) => {
@@ -120,4 +122,3 @@ process.on("uncaughtException", (error) => {
   console.error("Uncaught Exception:", error)
   // Don't exit the process, just log the error
 })
-
