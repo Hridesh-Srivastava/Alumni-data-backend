@@ -14,8 +14,18 @@ const protect = (req, res, next) => {
     // Verify token
     const decoded = jwt.verify(token, process.env.JWT_SECRET)
 
-    // Add user from payload
-    req.user = decoded.user
+    // Fix for user extraction from token
+    // Check if decoded has user property or if it's the ID directly
+    if (decoded.user) {
+      // Token format: { user: { id: '...' } }
+      req.user = decoded.user
+    } else if (decoded.id) {
+      // Token format: { id: '...' }
+      req.user = { id: decoded.id }
+    } else {
+      throw new Error("Invalid token structure")
+    }
+
     next()
   } catch (error) {
     console.error("Token verification error:", error)
@@ -38,3 +48,4 @@ export { protect, admin }
 // Default export - this allows 'import auth from "../middleware/auth.js"' to work
 const auth = { protect, admin }
 export default auth
+

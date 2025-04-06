@@ -1,4 +1,5 @@
 import jwt from "jsonwebtoken"
+import bcrypt from "bcryptjs"
 import User from "../models/user.js"
 
 // Generate JWT
@@ -114,7 +115,17 @@ export const updateUserProfile = async (req, res) => {
       user.name = req.body.name || user.name
       user.email = req.body.email || user.email
 
+      // Fix for password update - properly handle password changes
       if (req.body.password) {
+        // If current password is provided, verify it first
+        if (req.body.currentPassword) {
+          const isMatch = await bcrypt.compare(req.body.currentPassword, user.password)
+          if (!isMatch) {
+            return res.status(400).json({ message: "Current password is incorrect" })
+          }
+        }
+
+        // Set the new password - the model will hash it
         user.password = req.body.password
       }
 
@@ -148,38 +159,37 @@ export const updateUserSettings = async (req, res) => {
     if (user) {
       // Update settings if provided
       if (req.body.settings) {
+        // Fix for settings update - properly handle nested objects
+
+        // Create a deep copy of the current settings
+        const currentSettings = JSON.parse(JSON.stringify(user.settings || {}))
+
         // Notifications
         if (req.body.settings.notifications) {
-          user.settings.notifications.email =
-            req.body.settings.notifications.email !== undefined
-              ? req.body.settings.notifications.email
-              : user.settings.notifications.email
-
-          user.settings.notifications.browser =
-            req.body.settings.notifications.browser !== undefined
-              ? req.body.settings.notifications.browser
-              : user.settings.notifications.browser
+          currentSettings.notifications = {
+            ...currentSettings.notifications,
+            ...req.body.settings.notifications,
+          }
         }
 
         // Privacy
         if (req.body.settings.privacy) {
-          user.settings.privacy.showEmail =
-            req.body.settings.privacy.showEmail !== undefined
-              ? req.body.settings.privacy.showEmail
-              : user.settings.privacy.showEmail
-
-          user.settings.privacy.showProfile =
-            req.body.settings.privacy.showProfile !== undefined
-              ? req.body.settings.privacy.showProfile
-              : user.settings.privacy.showProfile
+          currentSettings.privacy = {
+            ...currentSettings.privacy,
+            ...req.body.settings.privacy,
+          }
         }
 
         // Appearance
         if (req.body.settings.appearance) {
-          user.settings.appearance.theme = req.body.settings.appearance.theme || user.settings.appearance.theme
-
-          user.settings.appearance.fontSize = req.body.settings.appearance.fontSize || user.settings.appearance.fontSize
+          currentSettings.appearance = {
+            ...currentSettings.appearance,
+            ...req.body.settings.appearance,
+          }
         }
+
+        // Update the user's settings with the merged settings
+        user.settings = currentSettings
       }
 
       const updatedUser = await user.save()
