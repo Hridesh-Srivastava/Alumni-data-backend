@@ -7,25 +7,43 @@ import alumniRoutes from "./routes/alumni.js"
 import contactRoutes from "./routes/contact.js"
 import academicUnitRoutes from "./routes/academicUnit.js"
 import settingsRoutes from "./routes/settings.js"
+import path from "path"
+import { fileURLToPath } from "url"
 
+// Load environment variables
 dotenv.config()
 
+// Ensure JWT_SECRET is set
+if (!process.env.JWT_SECRET) {
+  console.warn(
+    "WARNING: JWT_SECRET is not set. Using a default secret for development. This is not secure for production!",
+  )
+  process.env.JWT_SECRET = "your-secret-key-for-development"
+}
+
+// Create Express app
 const app = express()
 const PORT = process.env.PORT || 5001
+
+// Connect to MongoDB
+// connectDB() // Replaced with improved MongoDB connection
+
+// Get current directory
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = path.dirname(__filename)
 
 // Middleware
 app.use(express.json({ limit: "30mb" }))
 app.use(express.urlencoded({ limit: "30mb", extended: true }))
 
-// Configure CORS to allow requests from frontend
-app.use(
-  cors({
-    origin: process.env.FRONTEND_URL || "http://localhost:3000",
-    credentials: true,
-    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization"],
-  }),
-)
+// Configure CORS
+const corsOptions = {
+  origin: process.env.FRONTEND_URL || "http://localhost:3000",
+  credentials: true,
+  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization"],
+}
+app.use(cors(corsOptions))
 
 // Simple route to check if the server is running
 app.get("/", (req, res) => {
@@ -49,6 +67,24 @@ app.use("/api/contact", contactRoutes)
 app.use("/api/academic-units", academicUnitRoutes)
 app.use("/api/settings", settingsRoutes)
 
+// Health check endpoint
+// app.get("/health", (req, res) => {
+//   res.status(200).json({ status: "ok", message: "Server is running" })
+// })
+
+// Serve static files in production
+if (process.env.NODE_ENV === "production") {
+  app.use(express.static(path.join(__dirname, "../frontend/build")))
+
+  app.get("*", (req, res) => {
+    res.sendFile(path.resolve(__dirname, "../frontend", "build", "index.html"))
+  })
+} else {
+  // app.get("/", (req, res) => {
+  //   res.send("API is running...")
+  // }) // Replaced with simple route above
+}
+
 // Error handling middleware
 app.use((err, req, res, next) => {
   console.error("Unhandled error:", err)
@@ -68,7 +104,7 @@ app.use((req, res) => {
 const connectToMongoDB = async () => {
   try {
     // Connect to MongoDB with proper options
-    await mongoose.connect(process.env.MONGODB_URI)
+    await mongoose.connect(process.env.MONGODB_URI || "mongodb://localhost:27017/hsst-alumni")
     console.log(`MongoDB connected successfully! host: ${mongoose.connection.host}`)
     return true
   } catch (error) {
@@ -122,3 +158,4 @@ process.on("uncaughtException", (error) => {
   console.error("Uncaught Exception:", error)
   // Don't exit the process, just log the error
 })
+
