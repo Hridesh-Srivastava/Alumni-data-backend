@@ -12,7 +12,6 @@ import nodemailer from "nodemailer"
 import crypto from "crypto"
 import User from "../models/user.js"
 import { check, validationResult } from "express-validator"
-import bcrypt from "bcryptjs"
 
 const router = express.Router()
 
@@ -64,7 +63,10 @@ router.post("/forgot-password", [check("email", "Please include a valid email").
 
   try {
     console.log("Looking for user with email:", email)
-    const user = await User.findOne({ email })
+    // Use case-insensitive search for email
+    const user = await User.findOne({
+      email: { $regex: new RegExp(`^${email.replace(/[-/\\^$*+?.()|[\]{}]/g, "\\$&")}$`, "i") },
+    })
 
     if (!user) {
       console.log("User not found for email:", email)
@@ -190,9 +192,8 @@ router.post(
 
       console.log("User found, resetting password")
 
-      // Hash the new password
-      const salt = await bcrypt.genSalt(10)
-      user.password = await bcrypt.hash(newPassword, salt)
+      // Set the new password - let the pre-save hook handle the hashing
+      user.password = newPassword
 
       // Clear the reset token fields
       user.resetToken = undefined
