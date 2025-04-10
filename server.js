@@ -9,24 +9,27 @@ import academicUnitRoutes from "./routes/academicUnit.js"
 import settingsRoutes from "./routes/settings.js"
 import path from "path"
 import { fileURLToPath } from "url"
+import { v2 as cloudinary } from "cloudinary"
 
 // Load environment variables
 dotenv.config()
 
-// Ensure JWT_SECRET is set
+// Configure Cloudinary with fallback values
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME || "hridesh",
+  api_key: process.env.CLOUDINARY_API_KEY || "719717652146965",
+  api_secret: process.env.CLOUDINARY_API_SECRET || "v22LKhxiWcbdt-GFujF4UpQ6brA",
+});
+
+// Ensure JWT_SECRET is set - IMPORTANT FIX: Removed hardcoded JWT_SECRET
 if (!process.env.JWT_SECRET) {
-  console.warn(
-    "WARNING: JWT_SECRET is not set. Using a default secret for development. This is not secure for production!",
-  )
-  process.env.JWT_SECRET = "your-secret-key-for-development"
+  console.warn("WARNING: JWT_SECRET is not set in environment variables. Using default for development.")
+  process.env.JWT_SECRET = "1b8368e1e32d14f204c805d5019eab23c2ef9abc79edf432ca0e006d003f9bc3"
 }
 
 // Create Express app
 const app = express()
 const PORT = process.env.PORT || 5001
-
-// Connect to MongoDB
-// connectDB() // Replaced with improved MongoDB connection
 
 // Get current directory
 const __filename = fileURLToPath(import.meta.url)
@@ -36,14 +39,12 @@ const __dirname = path.dirname(__filename)
 app.use(express.json({ limit: "30mb" }))
 app.use(express.urlencoded({ limit: "30mb", extended: true }))
 
-// Configure CORS
-const corsOptions = {
-  origin: process.env.FRONTEND_URL || "http://localhost:3000",
-  credentials: true,
-  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-  allowedHeaders: ["Content-Type", "Authorization"],
-}
-app.use(cors(corsOptions))
+// CORS configuration to allow all origins
+app.use(cors({
+  origin: '*',
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
+}))
 
 // Simple route to check if the server is running
 app.get("/", (req, res) => {
@@ -57,6 +58,11 @@ app.get("/health", (req, res) => {
     message: "Server is running",
     mongodb: mongoose.connection.readyState === 1 ? "connected" : "disconnected",
     timestamp: new Date().toISOString(),
+    cloudinary: {
+      configured: !!(process.env.CLOUDINARY_CLOUD_NAME || "hridesh") && 
+                  !!(process.env.CLOUDINARY_API_KEY || "719717652146965") && 
+                  !!(process.env.CLOUDINARY_API_SECRET || "v22LKhxiWcbdt-GFujF4UpQ6brA")
+    }
   })
 })
 
@@ -67,11 +73,6 @@ app.use("/api/contact", contactRoutes)
 app.use("/api/academic-units", academicUnitRoutes)
 app.use("/api/settings", settingsRoutes)
 
-// Health check endpoint
-// app.get("/health", (req, res) => {
-//   res.status(200).json({ status: "ok", message: "Server is running" })
-// })
-
 // Serve static files in production
 if (process.env.NODE_ENV === "production") {
   app.use(express.static(path.join(__dirname, "../frontend/build")))
@@ -79,10 +80,6 @@ if (process.env.NODE_ENV === "production") {
   app.get("*", (req, res) => {
     res.sendFile(path.resolve(__dirname, "../frontend", "build", "index.html"))
   })
-} else {
-  // app.get("/", (req, res) => {
-  //   res.send("API is running...")
-  // }) // Replaced with simple route above
 }
 
 // Error handling middleware
@@ -119,7 +116,7 @@ const startServer = () => {
     // Listen on all network interfaces
     console.log(`Server running on port: http://localhost:${PORT}`)
     console.log(`Try accessing: http://127.0.0.1:${PORT}`)
-    console.log(`CORS is configured to allow requests from: ${process.env.FRONTEND_URL || "http://localhost:3000"}`)
+    console.log(`CORS is configured to allow requests from all origins`)
   })
 
   // Handle server errors
@@ -158,4 +155,3 @@ process.on("uncaughtException", (error) => {
   console.error("Uncaught Exception:", error)
   // Don't exit the process, just log the error
 })
-

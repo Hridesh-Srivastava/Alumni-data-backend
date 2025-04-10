@@ -6,12 +6,12 @@ import { CloudinaryStorage } from "multer-storage-cloudinary"
 import auth from "../middleware/auth.js"
 import Alumni from "../models/alumni.js"
 
-// Configure Cloudinary
+// Configure Cloudinary with fallback values if environment variables are missing
 cloudinary.config({
-  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-  api_key: process.env.CLOUDINARY_API_KEY,
-  api_secret: process.env.CLOUDINARY_API_SECRET,
-})
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME || "hridesh",
+  api_key: process.env.CLOUDINARY_API_KEY || "719717652146965",
+  api_secret: process.env.CLOUDINARY_API_SECRET || "v22LKhxiWcbdt-GFujF4UpQ6brA",
+});
 
 // Configure Cloudinary storage
 const storage = new CloudinaryStorage({
@@ -81,6 +81,103 @@ router.get("/", async (req, res) => {
   }
 })
 
+// @route   GET /api/alumni/search
+// @desc    Search alumni
+// @access  Private
+router.get("/search", auth.protect, async (req, res) => {
+  try {
+    const { query } = req.query
+
+    // Build search filter
+    const filter = {
+      // Always filter for HSST engineering department
+      academicUnit: "Himalayan School of Science and Technology",
+    }
+
+    if (query) {
+      filter.$or = [
+        { name: { $regex: query, $options: "i" } },
+        { registrationNumber: { $regex: query, $options: "i" } },
+        { program: { $regex: query, $options: "i" } },
+      ]
+    }
+
+    // Search alumni
+    const alumni = await Alumni.find(filter).sort({ createdAt: -1 })
+
+    res.json(alumni)
+  } catch (error) {
+    console.error("Error searching alumni:", error)
+    res.status(500).json({ message: "Server error" })
+  }
+})
+
+// @route   GET /api/alumni/stats
+// @desc    Get alumni statistics
+// @access  Public
+// IMPORTANT: This route must be defined BEFORE the /:id route to prevent MongoDB from trying to cast "stats" as an ObjectId
+router.get("/stats", async (req, res) => {
+  try {
+    console.log("Fetching alumni statistics...")
+
+    // Filter for HSST engineering department only
+    const filter = { academicUnit: "Himalayan School of Science and Technology" }
+
+    // Get total alumni count
+    const totalAlumni = await Alumni.countDocuments(filter)
+    console.log(`Total alumni: ${totalAlumni}`)
+
+    // Get alumni count by passing year
+    const byPassingYearResult = await Alumni.aggregate([
+      { $match: filter },
+      { $group: { _id: "$passingYear", count: { $sum: 1 } } },
+      { $sort: { _id: 1 } },
+    ])
+
+    // Get employment rate
+    const employedCount = await Alumni.countDocuments({
+      ...filter,
+      "employment.type": "Employed",
+    })
+
+    const employmentRate = totalAlumni > 0 ? Math.round((employedCount / totalAlumni) * 100) : 0
+
+    // Get higher education rate
+    const higherEducationCount = await Alumni.countDocuments({
+      ...filter,
+      "higherEducation.institutionName": { $exists: true, $ne: "" },
+    })
+
+    const higherEducationRate = totalAlumni > 0 ? Math.round((higherEducationCount / totalAlumni) * 100) : 0
+
+    // Format data for response
+    const byAcademicUnit = {
+      "Himalayan School of Science and Technology": totalAlumni,
+    }
+
+    const byPassingYear = {}
+    byPassingYearResult.forEach((item) => {
+      if (item._id) {
+        byPassingYear[item._id] = item.count
+      }
+    })
+
+    const stats = {
+      totalAlumni,
+      byAcademicUnit,
+      byPassingYear,
+      employmentRate,
+      higherEducationRate,
+    }
+
+    console.log("Stats generated successfully:", stats)
+    res.json(stats)
+  } catch (error) {
+    console.error("Error fetching statistics:", error)
+    res.status(500).json({ message: "Server error" })
+  }
+})
+
 // @route   GET /api/alumni/:id
 // @desc    Get alumni by ID
 // @access  Private
@@ -125,6 +222,8 @@ router.post(
     }
 
     try {
+      console.log("Creating new alumni with data:", req.body);
+      
       // Parse JSON strings if they were sent as strings
       let contactDetails = req.body.contactDetails
       let qualifiedExams = req.body.qualifiedExams
@@ -132,19 +231,39 @@ router.post(
       let higherEducation = req.body.higherEducation
 
       if (typeof contactDetails === "string") {
-        contactDetails = JSON.parse(contactDetails)
+        try {
+          contactDetails = JSON.parse(contactDetails)
+        } catch (e) {
+          console.error("Error parsing contactDetails:", e)
+          contactDetails = {}
+        }
       }
 
       if (typeof qualifiedExams === "string") {
-        qualifiedExams = JSON.parse(qualifiedExams)
+        try {
+          qualifiedExams = JSON.parse(qualifiedExams)
+        } catch (e) {
+          console.error("Error parsing qualifiedExams:", e)
+          qualifiedExams = {}
+        }
       }
 
       if (typeof employment === "string") {
-        employment = JSON.parse(employment)
+        try {
+          employment = JSON.parse(employment)
+        } catch (e) {
+          console.error("Error parsing employment:", e)
+          employment = {}
+        }
       }
 
       if (typeof higherEducation === "string") {
-        higherEducation = JSON.parse(higherEducation)
+        try {
+          higherEducation = JSON.parse(higherEducation)
+        } catch (e) {
+          console.error("Error parsing higherEducation:", e)
+          higherEducation = {}
+        }
       }
 
       // Check if alumni with same registration number already exists
@@ -160,6 +279,8 @@ router.post(
         qualificationImageUrl: req.files?.qualificationImage ? req.files.qualificationImage[0].path : null,
         employmentImageUrl: req.files?.employmentImage ? req.files.employmentImage[0].path : null,
       }
+
+      console.log("File URLs:", fileUrls);
 
       // Create new alumni
       const newAlumni = new Alumni({
@@ -185,8 +306,11 @@ router.post(
         createdBy: req.user.id,
       })
 
+      console.log("Saving new alumni:", newAlumni);
+
       // Save to database
       const alumni = await newAlumni.save()
+      console.log("Alumni saved successfully:", alumni);
 
       res.json(alumni)
     } catch (error) {
@@ -224,19 +348,39 @@ router.put("/:id", [auth.protect, uploadFiles], async (req, res) => {
     let higherEducation = req.body.higherEducation
 
     if (typeof contactDetails === "string") {
-      contactDetails = JSON.parse(contactDetails)
+      try {
+        contactDetails = JSON.parse(contactDetails)
+      } catch (e) {
+        console.error("Error parsing contactDetails:", e)
+        contactDetails = {}
+      }
     }
 
     if (typeof qualifiedExams === "string") {
-      qualifiedExams = JSON.parse(qualifiedExams)
+      try {
+        qualifiedExams = JSON.parse(qualifiedExams)
+      } catch (e) {
+        console.error("Error parsing qualifiedExams:", e)
+        qualifiedExams = {}
+      }
     }
 
     if (typeof employment === "string") {
-      employment = JSON.parse(employment)
+      try {
+        employment = JSON.parse(employment)
+      } catch (e) {
+        console.error("Error parsing employment:", e)
+        employment = {}
+      }
     }
 
     if (typeof higherEducation === "string") {
-      higherEducation = JSON.parse(higherEducation)
+      try {
+        higherEducation = JSON.parse(higherEducation)
+      } catch (e) {
+        console.error("Error parsing higherEducation:", e)
+        higherEducation = {}
+      }
     }
 
     // Get file URLs if files were uploaded
@@ -317,101 +461,4 @@ router.delete("/:id", auth.protect, auth.admin, async (req, res) => {
   }
 })
 
-// @route   GET /api/alumni/search
-// @desc    Search alumni
-// @access  Private
-router.get("/search", auth.protect, async (req, res) => {
-  try {
-    const { query } = req.query
-
-    // Build search filter
-    const filter = {
-      // Always filter for HSST engineering department
-      academicUnit: "Himalayan School of Science and Technology",
-    }
-
-    if (query) {
-      filter.$or = [
-        { name: { $regex: query, $options: "i" } },
-        { registrationNumber: { $regex: query, $options: "i" } },
-        { program: { $regex: query, $options: "i" } },
-      ]
-    }
-
-    // Search alumni
-    const alumni = await Alumni.find(filter).sort({ createdAt: -1 })
-
-    res.json(alumni)
-  } catch (error) {
-    console.error("Error searching alumni:", error)
-    res.status(500).json({ message: "Server error" })
-  }
-})
-
-// @route   GET /api/alumni/stats
-// @desc    Get alumni statistics
-// @access  Public
-router.get("/stats", async (req, res) => {
-  try {
-    console.log("Fetching alumni statistics...")
-
-    // Filter for HSST engineering department only
-    const filter = { academicUnit: "Himalayan School of Science and Technology" }
-
-    // Get total alumni count
-    const totalAlumni = await Alumni.countDocuments(filter)
-    console.log(`Total alumni: ${totalAlumni}`)
-
-    // Get alumni count by passing year
-    const byPassingYearResult = await Alumni.aggregate([
-      { $match: filter },
-      { $group: { _id: "$passingYear", count: { $sum: 1 } } },
-      { $sort: { _id: 1 } },
-    ])
-
-    // Get employment rate
-    const employedCount = await Alumni.countDocuments({
-      ...filter,
-      "employment.type": "Employed",
-    })
-
-    const employmentRate = totalAlumni > 0 ? Math.round((employedCount / totalAlumni) * 100) : 0
-
-    // Get higher education rate
-    const higherEducationCount = await Alumni.countDocuments({
-      ...filter,
-      "higherEducation.institutionName": { $exists: true, $ne: "" },
-    })
-
-    const higherEducationRate = totalAlumni > 0 ? Math.round((higherEducationCount / totalAlumni) * 100) : 0
-
-    // Format data for response
-    const byAcademicUnit = {
-      "Himalayan School of Science and Technology": totalAlumni,
-    }
-
-    const byPassingYear = {}
-    byPassingYearResult.forEach((item) => {
-      if (item._id) {
-        byPassingYear[item._id] = item.count
-      }
-    })
-
-    const stats = {
-      totalAlumni,
-      byAcademicUnit,
-      byPassingYear,
-      employmentRate,
-      higherEducationRate,
-    }
-
-    console.log("Stats generated successfully:", stats)
-    res.json(stats)
-  } catch (error) {
-    console.error("Error fetching statistics:", error)
-    res.status(500).json({ message: "Server error" })
-  }
-})
-
 export default router
-
