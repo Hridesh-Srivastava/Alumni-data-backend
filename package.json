@@ -7,7 +7,7 @@
     "test": "echo \"Error: no test specified\" && exit 1",
     "start": "nodemon server.js",
     "debug": "node debug.js",
-    "dev": "nodemon server-fix.js",
+    "dev": "nodemon server.js",
     "vercel-build": "echo 'Building API'"
   },
   "keywords": [],
