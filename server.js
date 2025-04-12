@@ -17,14 +17,15 @@ dotenv.config()
 // Configure Cloudinary with fallback values
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME || "hridesh",
-  api_key: process.env.CLOUDINARY_API_KEY || "719717652146965",
-  api_secret: process.env.CLOUDINARY_API_SECRET || "v22LKhxiWcbdt-GFujF4UpQ6brA",
+  api_key: process.env.CLOUDINARY_API_KEY ,
+  api_secret: process.env.CLOUDINARY_API_SECRET ,
 });
 
 // Ensure JWT_SECRET is set - IMPORTANT FIX: Removed hardcoded JWT_SECRET
 if (!process.env.JWT_SECRET) {
-  console.warn("WARNING: JWT_SECRET is not set in environment variables. Using default for development.")
-  process.env.JWT_SECRET = "1b8368e1e32d14f204c805d5019eab23c2ef9abc79edf432ca0e006d003f9bc3"
+  console.error("ERROR: JWT_SECRET is not set in environment variables. Please set it for security.")
+  console.error("The application will exit now to prevent security risks.")
+  process.exit(1)
 }
 
 // Create Express app
@@ -41,7 +42,8 @@ app.use(express.urlencoded({ limit: "30mb", extended: true }))
 
 // CORS configuration to allow all origins
 app.use(cors({
-  origin: '*',
+  origin: process.env.CORS_ORIGIN || 'http://localhost:3000',
+  credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization']
 }))
@@ -60,8 +62,8 @@ app.get("/health", (req, res) => {
     timestamp: new Date().toISOString(),
     cloudinary: {
       configured: !!(process.env.CLOUDINARY_CLOUD_NAME || "hridesh") && 
-                  !!(process.env.CLOUDINARY_API_KEY || "719717652146965") && 
-                  !!(process.env.CLOUDINARY_API_SECRET || "v22LKhxiWcbdt-GFujF4UpQ6brA")
+                  !!(process.env.CLOUDINARY_API_KEY) && 
+                  !!(process.env.CLOUDINARY_API_SECRET)
     }
   })
 })
