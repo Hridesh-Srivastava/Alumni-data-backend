@@ -11,7 +11,7 @@ const generateToken = (user) => {
       email: user.email,
       role: user.role,
     },
-    process.env.JWT_SECRET || "your-secret-key-for-development",
+    process.env.JWT_SECRET,
     {
       expiresIn: "30d",
     },

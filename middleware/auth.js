@@ -18,7 +18,7 @@ const protect = (req, res, next) => {
 
   try {
     // Verify token
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || "your-secret-key-for-development")
+    const decoded = jwt.verify(token, process.env.JWT_SECRET)
 
     console.log("Token verified successfully for user:", decoded.id || decoded.user?.id)
 

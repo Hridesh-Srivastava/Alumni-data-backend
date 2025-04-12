@@ -9,8 +9,8 @@ import Alumni from "../models/alumni.js"
 // Configure Cloudinary with fallback values if environment variables are missing
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME || "hridesh",
-  api_key: process.env.CLOUDINARY_API_KEY || "719717652146965",
-  api_secret: process.env.CLOUDINARY_API_SECRET || "v22LKhxiWcbdt-GFujF4UpQ6brA",
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET,
 });
 
 // Configure Cloudinary storage
