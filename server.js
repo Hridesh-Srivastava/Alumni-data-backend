@@ -110,7 +110,7 @@ const connectToMongoDB = async () => {
   }
 }
 
-// Start server
+
 const startServer = () => {
   const server = app.listen(PORT, "0.0.0.0", () => {
     // Listen on all network interfaces
