@@ -17,14 +17,13 @@ dotenv.config()
 // Configure Cloudinary with fallback values
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME || "hridesh",
-  api_key: process.env.CLOUDINARY_API_KEY ,
-  api_secret: process.env.CLOUDINARY_API_SECRET ,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET,
 });
 
 // Ensure JWT_SECRET is set - IMPORTANT FIX: Removed hardcoded JWT_SECRET
 if (!process.env.JWT_SECRET) {
-  console.error("ERROR: JWT_SECRET is not set in environment variables. Please set it for security.")
-  console.error("The application will exit now to prevent security risks.")
+  console.warn("WARNING: JWT_SECRET is not set in environment variables. Using default for development.")
   process.exit(1)
 }
 
@@ -42,8 +41,7 @@ app.use(express.urlencoded({ limit: "30mb", extended: true }))
 
 // CORS configuration to allow all origins
 app.use(cors({
-  origin: process.env.CORS_ORIGIN || 'http://localhost:3000',
-  credentials: true,
+  origin: '*',
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization']
 }))
