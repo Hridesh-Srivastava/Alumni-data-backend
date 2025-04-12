@@ -41,7 +41,7 @@ app.use(express.urlencoded({ limit: "30mb", extended: true }))
 
 // CORS configuration to allow all origins
 app.use(cors({
-  origin: '*',
+  origin: ['https://hsst-alumni-frontend.vercel.app', 'http://localhost:3000'],
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization']
 }))
