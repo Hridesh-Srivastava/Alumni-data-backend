@@ -62,10 +62,10 @@ const server = app.listen(PORT, "0.0.0.0", async () => {
     console.log("\nChecking if main backend server is running...")
     try {
       const mainBackendEndpoints = [
-        "http://localhost:5000",
-        "http://127.0.0.1:5000",
-        "http://localhost:5000/health",
-        "http://127.0.0.1:5000/health",
+        "http://localhost:5001",
+        "http://127.0.0.1:5001",
+        "http://localhost:5001/health",
+        "http://127.0.0.1:5001/health",
       ]
 
       let mainServerRunning = false
@@ -108,7 +108,7 @@ const server = app.listen(PORT, "0.0.0.0", async () => {
     try {
       const frontendEnvPath = path.join(__dirname, "..", "hsst-alumni-frontend", ".env.local")
       const envContent = `# Frontend environment variables
-NEXT_PUBLIC_API_URL=http://127.0.0.1:5000/api
+NEXT_PUBLIC_API_URL=http://127.0.0.1:5001/api
 `
 
       fs.writeFileSync(frontendEnvPath, envContent)
@@ -116,7 +116,7 @@ NEXT_PUBLIC_API_URL=http://127.0.0.1:5000/api
     } catch (error) {
       console.log(`\x1b[31m❌ Failed to update frontend .env.local: ${error.message}\x1b[0m`)
       console.log("Please manually update your frontend .env.local file to use:")
-      console.log("NEXT_PUBLIC_API_URL=http://127.0.0.1:5000/api")
+      console.log("NEXT_PUBLIC_API_URL=http://127.0.0.1:5001/api")
     }
 
     console.log("\n\x1b[36mRecommended actions:\x1b[0m")
