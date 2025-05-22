@@ -1,7 +1,7 @@
 {
   "name": "hsst-alumni-backend",
   "version": "1.0.0",
-  "description": "Backend for HSST Alumni Data Collection System",
+  "description": "Backend for SST Alumni Data Collection System",
   "main": "server.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",

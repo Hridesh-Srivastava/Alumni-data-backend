@@ -8,7 +8,7 @@ const AlumniSchema = new mongoose.Schema({
   academicUnit: {
     type: String,
     required: true,
-    default: "Himalayan School of Science and Technology", // Default to HSST
+    default: "School of Science and Technology", // Default to SST
   },
   program: {
     type: String,

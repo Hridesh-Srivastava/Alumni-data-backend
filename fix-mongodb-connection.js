@@ -11,7 +11,7 @@ const __dirname = path.dirname(__filename)
 // Load environment variables
 dotenv.config()
 
-console.log("\x1b[36m=== HSST Alumni MongoDB Connection Fix ===\x1b[0m")
+console.log("\x1b[36m=== SST Alumni MongoDB Connection Fix ===\x1b[0m")
 
 // Check if .env file exists
 const envPath = path.join(__dirname, ".env")

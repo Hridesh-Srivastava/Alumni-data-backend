@@ -13,7 +13,7 @@ const __dirname = path.dirname(__filename);
 // Load environment variables
 dotenv.config();
 
-console.log("\x1b[36m=== HSST Alumni Backend Diagnostics ===\x1b[0m");
+console.log("\x1b[36m=== SST Alumni Backend Diagnostics ===\x1b[0m");
 
 // Check if .env file exists
 const envPath = path.join(__dirname, ".env");

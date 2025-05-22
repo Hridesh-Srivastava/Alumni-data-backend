@@ -48,7 +48,7 @@ app.use(cors({
 
 // Simple route to check if the server is running
 app.get("/", (req, res) => {
-  res.send("HSST Alumni API is running")
+  res.send("SST Alumni API is running")
 })
 
 // Add a health check endpoint

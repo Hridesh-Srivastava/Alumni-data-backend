@@ -49,8 +49,8 @@ router.get("/", async (req, res) => {
     // Build filter object
     const filter = {}
 
-    // Always filter for HSST engineering department
-    filter.academicUnit = "Himalayan School of Science and Technology"
+    // Always filter for SST engineering department
+    filter.academicUnit = "School of Science and Technology"
 
     if (req.query.passingYear && req.query.passingYear !== "all") {
       filter.passingYear = req.query.passingYear
@@ -90,8 +90,8 @@ router.get("/search", auth.protect, async (req, res) => {
 
     // Build search filter
     const filter = {
-      // Always filter for HSST engineering department
-      academicUnit: "Himalayan School of Science and Technology",
+      // Always filter for SST engineering department
+      academicUnit: "School of Science and Technology",
     }
 
     if (query) {
@@ -120,8 +120,8 @@ router.get("/stats", async (req, res) => {
   try {
     console.log("Fetching alumni statistics...")
 
-    // Filter for HSST engineering department only
-    const filter = { academicUnit: "Himalayan School of Science and Technology" }
+    // Filter for SST engineering department only
+    const filter = { academicUnit: "School of Science and Technology" }
 
     // Get total alumni count
     const totalAlumni = await Alumni.countDocuments(filter)
@@ -152,7 +152,7 @@ router.get("/stats", async (req, res) => {
 
     // Format data for response
     const byAcademicUnit = {
-      "Himalayan School of Science and Technology": totalAlumni,
+      "School of Science and Technology": totalAlumni,
     }
 
     const byPassingYear = {}
@@ -285,7 +285,7 @@ router.post(
       // Create new alumni
       const newAlumni = new Alumni({
         name: req.body.name,
-        academicUnit: "Himalayan School of Science and Technology", // Always set to HSST
+        academicUnit: "School of Science and Technology", // Always set to SST
         program: req.body.program,
         passingYear: req.body.passingYear,
         registrationNumber: req.body.registrationNumber,
@@ -393,7 +393,7 @@ router.put("/:id", [auth.protect, uploadFiles], async (req, res) => {
     // Update fields
     const updateFields = {
       name: req.body.name || alumni.name,
-      academicUnit: "Himalayan School of Science and Technology", // Always set to HSST
+      academicUnit: "School of Science and Technology", // Always set to SST
       program: req.body.program || alumni.program,
       passingYear: req.body.passingYear || alumni.passingYear,
       registrationNumber: req.body.registrationNumber || alumni.registrationNumber,

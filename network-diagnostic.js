@@ -10,7 +10,7 @@ const execAsync = promisify(exec)
 const PORT = process.env.PORT || 5000
 const FRONTEND_URL = process.env.FRONTEND_URL || "http://localhost:3000"
 
-console.log("\x1b[36m=== HSST Alumni Network Diagnostics ===\x1b[0m")
+console.log("\x1b[36m=== SST Alumni Network Diagnostics ===\x1b[0m")
 
 // Check if port is in use
 async function checkPort() {

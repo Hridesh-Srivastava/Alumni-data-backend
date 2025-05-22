@@ -25,10 +25,10 @@ function addMockData() {
         const alumni_record = {
           _id: Math.random().toString(36).substring(2, 9),
           name: `Alumni ${i + 1}`,
-          academicUnit: "Himalayan School of Science and Technology",
+          academicUnit: "School of Science and Technology",
           program,
           passingYear,
-          registrationNumber: `HSST${2010 + Math.floor(Math.random() * 13)}${String(1000 + i).padStart(4, "0")}`,
+          registrationNumber: `SST${2010 + Math.floor(Math.random() * 13)}${String(1000 + i).padStart(4, "0")}`,
           contactDetails: {
             email: `alumni${i + 1}@example.com`,
             phone: `+91${Math.floor(Math.random() * 10000000000)

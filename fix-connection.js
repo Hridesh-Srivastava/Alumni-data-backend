@@ -38,7 +38,7 @@ app.get("/health", (req, res) => {
 
 // Start the test server
 const server = app.listen(PORT, "0.0.0.0", async () => {
-  console.log("\x1b[36m=== HSST Alumni Connection Fix Tool ===\x1b[0m")
+  console.log("\x1b[36m=== SST Alumni Connection Fix Tool ===\x1b[0m")
   console.log(`Test server running at http://localhost:${PORT}`)
 
   // Check if we can connect to our own test server
