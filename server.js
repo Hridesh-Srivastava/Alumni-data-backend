@@ -34,8 +34,27 @@ const PORT = process.env.PORT || 5001
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 
-// Security Middleware
-// Set security HTTP headers with better configuration
+
+app.set("trust proxy", 1)
+
+app.use(
+  cors({
+    origin: [
+      "https://hsst-alumni-frontend.vercel.app",
+      "http://localhost:3000",
+      "https://hsst-alumni-backend.vercel.app",
+    ],
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With"],
+    credentials: true,
+    optionsSuccessStatus: 200, // For legacy browser support
+  }),
+)
+
+// Handle preflight requests explicitly
+app.options("*", cors())
+
+
 app.use(
   helmet({
     contentSecurityPolicy: {
@@ -48,28 +67,53 @@ app.use(
         connectSrc: ["'self'", "https://api.cloudinary.com"],
       },
     },
+    crossOriginEmbedderPolicy: false, 
   }),
 )
 
-// General rate limiting
-const generalLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // Limit each IP to 100 requests per windowMs
-  standardHeaders: true,
-  legacyHeaders: false,
-  message: "Too many requests from this IP, please try again after 15 minutes",
-})
+// Custom rate limiter that returns JSON with CORS headers
+const createRateLimiter = (windowMs, max, message) => {
+  return rateLimit({
+    windowMs,
+    max,
+    standardHeaders: true,
+    legacyHeaders: false,
+    keyGenerator: (req) => {
+      return req.ip || req.connection.remoteAddress || "unknown"
+    },
+    handler: (req, res) => {
+      res.header("Access-Control-Allow-Origin", req.headers.origin || "*")
+      res.header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+      res.header("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With")
+      res.header("Access-Control-Allow-Credentials", "true")
 
-// Strict rate limiting for auth routes
-const authLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 5, // Only 5 attempts per 15 minutes for auth
-  standardHeaders: true,
-  legacyHeaders: false,
-  message: "Too many authentication attempts, please try again after 15 minutes",
-})
+      res.status(429).json({
+        error: "Too Many Requests",
+        message: message,
+        retryAfter: Math.round(windowMs / 1000),
+      })
+    },
+    skip: (req) => {
+      // Skip rate limiting for OPTIONS requests (preflight)
+      return req.method === "OPTIONS"
+    },
+  })
+}
 
-// Apply rate limiting
+// More lenient rate limiting
+const generalLimiter = createRateLimiter(
+  15 * 60 * 1000, // 15 minutes
+  200, // Increased from 100 to 200 requests
+  "Too many requests from this IP, please try again after 15 minutes",
+)
+
+const authLimiter = createRateLimiter(
+  15 * 60 * 1000, // 15 minutes
+  20, // Increased from 5 to 20 attempts for auth
+  "Too many authentication attempts, please try again after 15 minutes",
+)
+
+// Apply rate limiting after CORS
 app.use("/api/", generalLimiter)
 app.use("/api/auth/login", authLimiter)
 app.use("/api/auth/register", authLimiter)
@@ -84,19 +128,14 @@ app.use(mongoSanitize())
 app.use(express.json({ limit: "30mb" }))
 app.use(express.urlencoded({ limit: "30mb", extended: true }))
 
-// CORS configuration with credentials support
-app.use(
-  cors({
-    origin: ["https://hsst-alumni-frontend.vercel.app", "http://localhost:3000"],
-    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization"],
-    credentials: true, // Enable credentials for cookies
-  }),
-)
-
 // Simple route to check if the server is running
 app.get("/", (req, res) => {
-  res.send("SST Alumni API is running securely")
+  res.json({
+    message: "SST Alumni API is running securely",
+    ip: req.ip,
+    ips: req.ips,
+    trustProxy: app.get("trust proxy"),
+  })
 })
 
 // Enhanced health check endpoint
@@ -106,6 +145,16 @@ app.get("/health", (req, res) => {
     message: "Server is running securely",
     mongodb: mongoose.connection.readyState === 1 ? "connected" : "disconnected",
     timestamp: new Date().toISOString(),
+    network: {
+      ip: req.ip,
+      ips: req.ips,
+      trustProxy: app.get("trust proxy"),
+      userAgent: req.get("User-Agent"),
+    },
+    cors: {
+      enabled: true,
+      origins: ["https://hsst-alumni-frontend.vercel.app", "http://localhost:3000"],
+    },
     security: {
       helmet: "enabled",
       rateLimit: "enabled",
@@ -137,9 +186,16 @@ if (process.env.NODE_ENV === "production") {
   })
 }
 
-// Enhanced error handling middleware
+// Enhanced error handling middleware with CORS headers
 app.use((err, req, res, next) => {
   console.error("Unhandled error:", err)
+
+  // Ensure CORS headers are set even for errors
+  res.header("Access-Control-Allow-Origin", req.headers.origin || "*")
+  res.header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+  res.header("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With")
+  res.header("Access-Control-Allow-Credentials", "true")
+
   res.status(500).json({
     message: "Internal server error",
     error: process.env.NODE_ENV === "development" ? err.message : undefined,
@@ -149,6 +205,13 @@ app.use((err, req, res, next) => {
 // Handle 404 errors for any undefined routes
 app.use((req, res) => {
   console.log(`Route not found: ${req.method} ${req.originalUrl}`)
+
+  // Ensure CORS headers for 404s too
+  res.header("Access-Control-Allow-Origin", req.headers.origin || "*")
+  res.header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+  res.header("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With")
+  res.header("Access-Control-Allow-Credentials", "true")
+
   res.status(404).json({ message: `Route not found: ${req.method} ${req.originalUrl}` })
 })
 
@@ -171,7 +234,10 @@ const connectToMongoDB = async () => {
 const startServer = () => {
   const server = app.listen(PORT, "0.0.0.0", () => {
     console.log(`Secure server running on port: http://localhost:${PORT}`)
+    console.log(`Trust proxy setting: ${app.get("trust proxy")}`)
     console.log(`Security features enabled: Helmet, Rate Limiting, XSS Protection, Mongo Sanitization`)
+    console.log(`CORS is configured to allow requests from specified origins`)
+    console.log(`CORS origins: https://hsst-alumni-frontend.vercel.app, http://localhost:3000`)
   })
 
   server.on("error", (error) => {
