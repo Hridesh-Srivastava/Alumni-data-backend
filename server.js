@@ -265,7 +265,7 @@ connectToMongoDB()
     startServer()
   })
 
-// Handle unexpected errors
+
 process.on("unhandledRejection", (error) => {
   console.error("Unhandled Rejection:", error)
 })
