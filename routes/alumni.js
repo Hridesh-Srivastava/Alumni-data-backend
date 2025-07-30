@@ -33,9 +33,60 @@ const uploadFiles = upload.fields([
   { name: "basicInfoImage", maxCount: 1 },
   { name: "qualificationImage", maxCount: 1 },
   { name: "employmentImage", maxCount: 1 },
+  { name: "higherEducationImage", maxCount: 1 },
 ])
 
 const router = express.Router()
+
+// @route   GET /api/alumni/programs
+// @desc    Get all available programs
+// @access  Public
+router.get("/programs", async (req, res) => {
+  try {
+    // Get distinct programs from the database
+    const programs = await Alumni.distinct("program")
+    
+    // Sort alphabetically
+    const sortedPrograms = programs.sort()
+    
+    console.log("Available programs:", sortedPrograms)
+    
+    res.json({
+      data: sortedPrograms,
+      total: sortedPrograms.length
+    })
+  } catch (error) {
+    console.error("Error fetching programs:", error)
+    res.status(500).json({ message: "Server error" })
+  }
+})
+
+// @route   GET /api/alumni/passing-years
+// @desc    Get all available passing years
+// @access  Public
+router.get("/passing-years", async (req, res) => {
+  try {
+    // Get distinct passing years from the database
+    const passingYears = await Alumni.distinct("passingYear")
+    
+    // Sort in descending order (newest first)
+    const sortedYears = passingYears.sort((a, b) => {
+      const yearA = parseInt(a.split('-')[0])
+      const yearB = parseInt(b.split('-')[0])
+      return yearB - yearA
+    })
+    
+    console.log("Available passing years:", sortedYears)
+    
+    res.json({
+      data: sortedYears,
+      total: sortedYears.length
+    })
+  } catch (error) {
+    console.error("Error fetching passing years:", error)
+    res.status(500).json({ message: "Server error" })
+  }
+})
 
 // @route   GET /api/alumni
 // @desc    Get all alumni with pagination and filters
@@ -43,28 +94,39 @@ const router = express.Router()
 router.get("/", async (req, res) => {
   try {
     const page = Number.parseInt(req.query.page) || 1
-    const limit = Number.parseInt(req.query.limit) || 10
+    const limit = Math.min(Number.parseInt(req.query.limit) || 10, 100) // Maximum 100 records per page
     const skip = (page - 1) * limit
 
     // Build filter object
     const filter = {}
 
-    // Always filter for SST engineering department
-    filter.academicUnit = "School of Science and Technology"
+    // Handle academic unit filter
+    if (req.query.academicUnit && req.query.academicUnit !== "all") {
+      filter.academicUnit = req.query.academicUnit
+    }
+    // If "all" is selected or no filter, don't add academicUnit filter - show all units
 
     if (req.query.passingYear && req.query.passingYear !== "all") {
       filter.passingYear = req.query.passingYear
     }
 
-    if (req.query.program) {
-      filter.program = { $regex: req.query.program, $options: "i" }
+    if (req.query.program && req.query.program.trim() !== "") {
+      // Use case-insensitive regex for program search
+      filter.program = { $regex: req.query.program.trim(), $options: "i" }
     }
+
+    console.log("Filter applied:", filter) // Debug log for filter performance
 
     // Get total count
     const total = await Alumni.countDocuments(filter)
 
-    // Get alumni with pagination
-    const alumni = await Alumni.find(filter).sort({ createdAt: -1 }).skip(skip).limit(limit)
+    // Get alumni with pagination and optimization
+    const alumni = await Alumni.find(filter)
+      .select('name contactDetails.email academicUnit passingYear program registrationNumber createdAt') // Only select needed fields
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit)
+      .lean() // Convert to plain JavaScript objects for better performance
 
     res.json({
       data: alumni,
@@ -82,17 +144,23 @@ router.get("/", async (req, res) => {
 })
 
 // @route   GET /api/alumni/search
-// @desc    Search alumni
+// @desc    Search alumni with pagination
 // @access  Private
 router.get("/search", auth.protect, async (req, res) => {
   try {
     const { query } = req.query
+    const page = Number.parseInt(req.query.page) || 1
+    const limit = Math.min(Number.parseInt(req.query.limit) || 10, 100) // Maximum 100 records per page
+    const skip = (page - 1) * limit
 
     // Build search filter
-    const filter = {
-      // Always filter for SST engineering department
-      academicUnit: "School of Science and Technology",
+    const filter = {}
+
+    // Handle academic unit filter
+    if (req.query.academicUnit && req.query.academicUnit !== "all") {
+      filter.academicUnit = req.query.academicUnit
     }
+    // If "all" is selected or no filter, don't add academicUnit filter - show all units
 
     if (query) {
       filter.$or = [
@@ -102,10 +170,26 @@ router.get("/search", auth.protect, async (req, res) => {
       ]
     }
 
-    // Search alumni
-    const alumni = await Alumni.find(filter).sort({ createdAt: -1 })
+    // Get total count for pagination
+    const total = await Alumni.countDocuments(filter)
 
-    res.json(alumni)
+    // Search alumni with pagination and optimization
+    const alumni = await Alumni.find(filter)
+      .select('name contactDetails.email academicUnit passingYear program registrationNumber createdAt') // Only select needed fields
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit)
+      .lean() // Convert to plain JavaScript objects for better performance
+
+    res.json({
+      data: alumni,
+      pagination: {
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit),
+      },
+    })
   } catch (error) {
     console.error("Error searching alumni:", error)
     res.status(500).json({ message: "Server error" })
@@ -120,12 +204,19 @@ router.get("/stats", async (req, res) => {
   try {
     console.log("Fetching alumni statistics...")
 
-    // Filter for SST engineering department only
-    const filter = { academicUnit: "School of Science and Technology" }
+    // No filter - get statistics for all academic units
+    const filter = {}
 
     // Get total alumni count
     const totalAlumni = await Alumni.countDocuments(filter)
     console.log(`Total alumni: ${totalAlumni}`)
+
+    // Get alumni count by academic unit
+    const byAcademicUnitResult = await Alumni.aggregate([
+      { $match: filter },
+      { $group: { _id: "$academicUnit", count: { $sum: 1 } } },
+      { $sort: { _id: 1 } },
+    ])
 
     // Get alumni count by passing year
     const byPassingYearResult = await Alumni.aggregate([
@@ -151,9 +242,12 @@ router.get("/stats", async (req, res) => {
     const higherEducationRate = totalAlumni > 0 ? Math.round((higherEducationCount / totalAlumni) * 100) : 0
 
     // Format data for response
-    const byAcademicUnit = {
-      "School of Science and Technology": totalAlumni,
-    }
+    const byAcademicUnit = {}
+    byAcademicUnitResult.forEach((item) => {
+      if (item._id) {
+        byAcademicUnit[item._id] = item.count
+      }
+    })
 
     const byPassingYear = {}
     byPassingYearResult.forEach((item) => {
@@ -278,6 +372,7 @@ router.post(
         basicInfoImageUrl: req.files?.basicInfoImage ? req.files.basicInfoImage[0].path : null,
         qualificationImageUrl: req.files?.qualificationImage ? req.files.qualificationImage[0].path : null,
         employmentImageUrl: req.files?.employmentImage ? req.files.employmentImage[0].path : null,
+        higherEducationImageUrl: req.files?.higherEducationImage ? req.files.higherEducationImage[0].path : null,
       }
 
       console.log("File URLs:", fileUrls);
@@ -300,7 +395,7 @@ router.post(
         },
         higherEducation: {
           ...(higherEducation || {}),
-          documentUrl: fileUrls.basicInfoImageUrl || higherEducation?.documentUrl || "",
+          documentUrl: fileUrls.higherEducationImageUrl || higherEducation?.documentUrl || "",
         },
         basicInfoImageUrl: fileUrls.basicInfoImageUrl,
         createdBy: req.user.id,
@@ -388,6 +483,7 @@ router.put("/:id", [auth.protect, uploadFiles], async (req, res) => {
       basicInfoImageUrl: req.files?.basicInfoImage ? req.files.basicInfoImage[0].path : null,
       qualificationImageUrl: req.files?.qualificationImage ? req.files.qualificationImage[0].path : null,
       employmentImageUrl: req.files?.employmentImage ? req.files.employmentImage[0].path : null,
+      higherEducationImageUrl: req.files?.higherEducationImage ? req.files.higherEducationImage[0].path : null,
     }
 
     // Update fields
@@ -413,7 +509,7 @@ router.put("/:id", [auth.protect, uploadFiles], async (req, res) => {
       higherEducation: {
         ...(higherEducation || alumni.higherEducation),
         documentUrl:
-          fileUrls.basicInfoImageUrl || higherEducation?.documentUrl || alumni.higherEducation?.documentUrl || "",
+          fileUrls.higherEducationImageUrl || higherEducation?.documentUrl || alumni.higherEducation?.documentUrl || "",
       },
       basicInfoImageUrl: fileUrls.basicInfoImageUrl || alumni.basicInfoImageUrl,
       updatedAt: Date.now(),

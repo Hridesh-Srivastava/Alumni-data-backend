@@ -96,5 +96,19 @@ const AlumniSchema = new mongoose.Schema({
 
 const Alumni = mongoose.model("Alumni", AlumniSchema)
 
+// Create indexes for better performance with large datasets
+AlumniSchema.index({ academicUnit: 1, createdAt: -1 }) // For main queries
+AlumniSchema.index({ registrationNumber: 1 }) // For unique lookups
+AlumniSchema.index({ name: 1 }) // For name searches
+AlumniSchema.index({ program: 1 }) // For program filtering
+AlumniSchema.index({ passingYear: 1 }) // For year filtering
+AlumniSchema.index({ "employment.type": 1 }) // For employment filtering
+
+// Compound indexes for filter combinations
+AlumniSchema.index({ academicUnit: 1, passingYear: 1, createdAt: -1 }) // For academic unit + year filtering
+AlumniSchema.index({ academicUnit: 1, program: 1, createdAt: -1 }) // For academic unit + program filtering
+AlumniSchema.index({ passingYear: 1, program: 1, createdAt: -1 }) // For year + program filtering
+AlumniSchema.index({ academicUnit: 1, passingYear: 1, program: 1, createdAt: -1 }) // For all filters combined
+
 export default Alumni
 
