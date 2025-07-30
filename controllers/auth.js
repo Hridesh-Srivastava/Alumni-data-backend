@@ -121,6 +121,13 @@ export const loginUser = async (req, res) => {
       return res.status(401).json({ message: "Invalid email or password" })
     }
 
+    // Check if user is OAuth-only (no password)
+    if (user.isOAuthUser && !user.password) {
+      return res.status(401).json({ 
+        message: "This account was created with Google. Please use Google Sign-In to access your account." 
+      })
+    }
+
     // Check password
     const isMatch = await bcrypt.compare(password, user.password)
 
@@ -186,6 +193,8 @@ export const updateUserProfile = async (req, res) => {
     // Update fields
     if (req.body.name) user.name = req.body.name
     if (req.body.email) user.email = req.body.email.toLowerCase().trim()
+    if (req.body.avatar) user.avatar = req.body.avatar
+    if (req.body.isOAuthUser !== undefined) user.isOAuthUser = req.body.isOAuthUser
 
     // Save user
     await user.save()
@@ -198,6 +207,8 @@ export const updateUserProfile = async (req, res) => {
       name: user.name,
       email: user.email,
       role: user.role,
+      avatar: user.avatar,
+      isOAuthUser: user.isOAuthUser,
       settings: user.settings,
       token,
     })

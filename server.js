@@ -24,8 +24,12 @@ cloudinary.config({
 })
 
 if (!process.env.JWT_SECRET) {
-  console.warn("WARNING: JWT_SECRET is not set in environment variables.")
-  process.exit(1)
+  console.error("CRITICAL ERROR: JWT_SECRET is not set in environment variables.")
+  if (process.env.NODE_ENV === 'production') {
+    process.exit(1)
+  } else {
+    console.warn("WARNING: JWT_SECRET is not set. Please set it in your .env file.")
+  }
 }
 
 const app = express()
@@ -198,7 +202,7 @@ app.use((err, req, res, next) => {
 
   res.status(500).json({
     message: "Internal server error",
-    error: process.env.NODE_ENV === "development" ? err.message : undefined,
+    error: process.env.NODE_ENV === "development" ? err.message : "An unexpected error occurred",
   })
 })
 

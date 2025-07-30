@@ -15,7 +15,21 @@ const UserSchema = new mongoose.Schema({
   },
   password: {
     type: String,
-    required: true,
+    required: function() {
+      return !this.googleId; // Password is required only if not using Google OAuth
+    },
+  },
+  googleId: {
+    type: String,
+    unique: true,
+    sparse: true, // Allows multiple null values
+  },
+  avatar: {
+    type: String,
+  },
+  isOAuthUser: {
+    type: Boolean,
+    default: false,
   },
   role: {
     type: String,
@@ -81,8 +95,8 @@ UserSchema.methods.matchPassword = async function (enteredPassword) {
 // Encrypt password using bcrypt
 UserSchema.pre("save", async function (next) {
   try {
-    // Only hash the password if it's modified (or new)
-    if (!this.isModified("password")) {
+    // Only hash the password if it's modified (or new) and exists
+    if (!this.isModified("password") || !this.password) {
       return next()
     }
 
