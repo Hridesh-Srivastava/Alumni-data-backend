@@ -22,14 +22,21 @@ const protect = (req, res, next) => {
 
     console.log("Token verified successfully for user:", decoded.id || decoded.user?.id)
 
-    // Set user in request object
+    // Set user in request object with all token data
     if (decoded.id) {
-      // Token format: { id: '...' }
-      req.user = { id: decoded.id }
+      // Token format: { id: '...', email: '...', role: '...' }
+      req.user = {
+        id: decoded.id,
+        email: decoded.email,
+        role: decoded.role
+      }
+      console.log("User set from decoded token:", req.user)
     } else if (decoded.user && decoded.user.id) {
-      // Token format: { user: { id: '...' } }
+      // Token format: { user: { id: '...', email: '...', role: '...' } }
       req.user = decoded.user
+      console.log("User set from decoded.user:", req.user)
     } else {
+      console.log("Invalid token structure - decoded:", decoded)
       throw new Error("Invalid token structure")
     }
 
@@ -51,10 +58,15 @@ const protect = (req, res, next) => {
 
 // Middleware to check if user is admin
 const admin = (req, res, next) => {
+  console.log("Admin middleware - User object:", req.user)
+  console.log("Admin middleware - User role:", req.user?.role)
+  
   if (req.user && req.user.role === "admin") {
+    console.log("Admin access granted")
     next()
   } else {
-    res.status(401).json({ message: "Not authorized as an admin" })
+    console.log("Admin access denied - User role:", req.user?.role)
+    res.status(403).json({ message: "Not authorized as an admin" })
   }
 }
 

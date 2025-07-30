@@ -530,20 +530,65 @@ router.put("/:id", [auth.protect, uploadFiles], async (req, res) => {
   }
 })
 
+// @route   DELETE /api/alumni/bulk
+// @desc    Delete multiple alumni
+// @access  Private
+router.delete("/bulk", auth.protect, auth.admin, async (req, res) => {
+  try {
+    console.log("Bulk delete request received")
+    console.log("User making request:", req.user)
+    console.log("Request body:", req.body)
+    
+    const { ids } = req.body
+
+    if (!ids || !Array.isArray(ids) || ids.length === 0) {
+      console.log("Invalid or missing IDs in request")
+      return res.status(400).json({ message: "Please provide an array of alumni IDs to delete" })
+    }
+
+    console.log("Attempting to delete alumni IDs:", ids)
+
+    // Delete multiple alumni
+    const result = await Alumni.deleteMany({ _id: { $in: ids } })
+    console.log("Bulk delete result:", result)
+
+    if (result.deletedCount === 0) {
+      console.log("No alumni found to delete")
+      return res.status(404).json({ message: "No alumni found to delete" })
+    }
+
+    console.log(`Successfully deleted ${result.deletedCount} alumni`)
+    res.json({ 
+      message: `${result.deletedCount} alumni removed successfully`,
+      deletedCount: result.deletedCount
+    })
+  } catch (error) {
+    console.error("Error deleting multiple alumni:", error)
+    res.status(500).json({ message: "Server error" })
+  }
+})
+
 // @route   DELETE /api/alumni/:id
 // @desc    Delete alumni
 // @access  Private
 router.delete("/:id", auth.protect, auth.admin, async (req, res) => {
   try {
+    console.log("Delete alumni request received for ID:", req.params.id)
+    console.log("User making request:", req.user)
+    
     // Find alumni
     const alumni = await Alumni.findById(req.params.id)
 
     if (!alumni) {
+      console.log("Alumni not found with ID:", req.params.id)
       return res.status(404).json({ message: "Alumni not found" })
     }
 
+    console.log("Found alumni:", alumni.name)
+
     // Delete alumni
-    await Alumni.deleteOne({ _id: req.params.id })
+    const deleteResult = await Alumni.deleteOne({ _id: req.params.id })
+    console.log("Delete result:", deleteResult)
 
     res.json({ message: "Alumni removed" })
   } catch (error) {
