@@ -8,7 +8,7 @@ const AlumniSchema = new mongoose.Schema({
   academicUnit: {
     type: String,
     required: true,
-    default: "School of Science and Technology", // Default to SST
+    // No default - user must select from their academic units
   },
   program: {
     type: String,
@@ -21,7 +21,7 @@ const AlumniSchema = new mongoose.Schema({
   registrationNumber: {
     type: String,
     required: true,
-    unique: true,
+    // Removed global unique constraint - handled by compound index
   },
   contactDetails: {
     email: {
@@ -84,6 +84,7 @@ const AlumniSchema = new mongoose.Schema({
   createdBy: {
     type: mongoose.Schema.Types.ObjectId,
     ref: "User",
+    required: true,
   },
   createdAt: {
     type: Date,
@@ -94,21 +95,24 @@ const AlumniSchema = new mongoose.Schema({
   },
 })
 
-const Alumni = mongoose.model("Alumni", AlumniSchema)
+// Create indexes BEFORE model creation
+// Compound unique index for user-specific uniqueness
+AlumniSchema.index({ registrationNumber: 1, createdBy: 1 }, { unique: true })
+AlumniSchema.index({ academicUnit: 1, createdBy: 1, createdAt: -1 })
 
-// Create indexes for better performance with large datasets
-AlumniSchema.index({ academicUnit: 1, createdAt: -1 }) // For main queries
-AlumniSchema.index({ registrationNumber: 1 }) // For unique lookups
-AlumniSchema.index({ name: 1 }) // For name searches
-AlumniSchema.index({ program: 1 }) // For program filtering
-AlumniSchema.index({ passingYear: 1 }) // For year filtering
-AlumniSchema.index({ "employment.type": 1 }) // For employment filtering
+// Single field indexes for queries
+AlumniSchema.index({ name: 1 })
+AlumniSchema.index({ program: 1 })
+AlumniSchema.index({ passingYear: 1 })
+AlumniSchema.index({ "employment.type": 1 })
 
 // Compound indexes for filter combinations
-AlumniSchema.index({ academicUnit: 1, passingYear: 1, createdAt: -1 }) // For academic unit + year filtering
-AlumniSchema.index({ academicUnit: 1, program: 1, createdAt: -1 }) // For academic unit + program filtering
-AlumniSchema.index({ passingYear: 1, program: 1, createdAt: -1 }) // For year + program filtering
-AlumniSchema.index({ academicUnit: 1, passingYear: 1, program: 1, createdAt: -1 }) // For all filters combined
+AlumniSchema.index({ academicUnit: 1, passingYear: 1, createdAt: -1 })
+AlumniSchema.index({ academicUnit: 1, program: 1, createdAt: -1 })
+AlumniSchema.index({ passingYear: 1, program: 1, createdAt: -1 })
+AlumniSchema.index({ academicUnit: 1, passingYear: 1, program: 1, createdAt: -1 })
+
+const Alumni = mongoose.model("Alumni", AlumniSchema)
 
 export default Alumni
 

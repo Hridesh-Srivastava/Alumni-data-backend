@@ -2,10 +2,11 @@ import AcademicUnit from "../models/academicUnit.js"
 
 // @desc    Get all academic units
 // @route   GET /api/academic-units
-// @access  Private/Admin
+// @access  Private
 export const getAcademicUnits = async (req, res) => {
   try {
-    const academicUnits = await AcademicUnit.find({})
+    // Only get academic units created by the current user
+    const academicUnits = await AcademicUnit.find({ createdBy: req.user.id })
     res.json(academicUnits)
   } catch (error) {
     console.error("Get academic units error:", error)
@@ -15,10 +16,14 @@ export const getAcademicUnits = async (req, res) => {
 
 // @desc    Get academic unit by ID
 // @route   GET /api/academic-units/:id
-// @access  Private/Admin
+// @access  Private
 export const getAcademicUnitById = async (req, res) => {
   try {
-    const academicUnit = await AcademicUnit.findById(req.params.id)
+    // Only allow user to access their own academic units
+    const academicUnit = await AcademicUnit.findOne({ 
+      _id: req.params.id, 
+      createdBy: req.user.id 
+    })
 
     if (academicUnit) {
       res.json(academicUnit)
@@ -33,12 +38,16 @@ export const getAcademicUnitById = async (req, res) => {
 
 // @desc    Create a new academic unit
 // @route   POST /api/academic-units
-// @access  Private/Admin
+// @access  Private
 export const createAcademicUnit = async (req, res) => {
   try {
     const { name, shortName, description } = req.body
 
-    const academicUnitExists = await AcademicUnit.findOne({ name })
+    // Check if academic unit exists for THIS user only
+    const academicUnitExists = await AcademicUnit.findOne({ 
+      name, 
+      createdBy: req.user.id 
+    })
 
     if (academicUnitExists) {
       return res.status(400).json({ message: "Academic unit already exists" })
@@ -48,6 +57,7 @@ export const createAcademicUnit = async (req, res) => {
       name,
       shortName,
       description,
+      createdBy: req.user.id, // Link to current user
     })
 
     if (academicUnit) {
@@ -63,12 +73,16 @@ export const createAcademicUnit = async (req, res) => {
 
 // @desc    Update an academic unit
 // @route   PUT /api/academic-units/:id
-// @access  Private/Admin
+// @access  Private
 export const updateAcademicUnit = async (req, res) => {
   try {
     const { name, shortName, description } = req.body
 
-    const academicUnit = await AcademicUnit.findById(req.params.id)
+    // Only allow user to update their own academic units
+    const academicUnit = await AcademicUnit.findOne({ 
+      _id: req.params.id, 
+      createdBy: req.user.id 
+    })
 
     if (academicUnit) {
       academicUnit.name = name || academicUnit.name
@@ -88,10 +102,14 @@ export const updateAcademicUnit = async (req, res) => {
 
 // @desc    Delete an academic unit
 // @route   DELETE /api/academic-units/:id
-// @access  Private/Admin
+// @access  Private
 export const deleteAcademicUnit = async (req, res) => {
   try {
-    const academicUnit = await AcademicUnit.findById(req.params.id)
+    // Only allow user to delete their own academic units
+    const academicUnit = await AcademicUnit.findOne({ 
+      _id: req.params.id, 
+      createdBy: req.user.id 
+    })
 
     if (academicUnit) {
       await academicUnit.deleteOne()

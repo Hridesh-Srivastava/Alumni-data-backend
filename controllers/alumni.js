@@ -1,14 +1,16 @@
 import Alumni from "../models/alumni.js";
+import mongoose from "mongoose";
 
 // @desc    Get all alumni
 // @route   GET /api/alumni
-// @access  Private/Admin
+// @access  Private
 export const getAlumni = async (req, res) => {
   try {
     const pageSize = Number(req.query.limit) || 10
     const page = Number(req.query.page) || 1
 
-    const filter = {}
+    // Always filter by the logged-in user
+    const filter = { createdBy: req.user.id }
 
     if (req.query.academicUnit && req.query.academicUnit !== "all") {
       filter.academicUnit = req.query.academicUnit
@@ -45,10 +47,14 @@ export const getAlumni = async (req, res) => {
 
 // @desc    Get alumni by ID
 // @route   GET /api/alumni/:id
-// @access  Private/Admin
+// @access  Private
 export const getAlumniById = async (req, res) => {
   try {
-    const alumni = await Alumni.findById(req.params.id)
+    // Only allow user to access their own alumni records
+    const alumni = await Alumni.findOne({ 
+      _id: req.params.id, 
+      createdBy: req.user.id 
+    })
 
     if (alumni) {
       res.json(alumni)
@@ -63,7 +69,7 @@ export const getAlumniById = async (req, res) => {
 
 // @desc    Create a new alumni
 // @route   POST /api/alumni
-// @access  Private/Admin
+// @access  Private
 export const createAlumni = async (req, res) => {
   try {
     const {
@@ -78,7 +84,11 @@ export const createAlumni = async (req, res) => {
       contactDetails,
     } = req.body
 
-    const alumniExists = await Alumni.findOne({ registrationNumber })
+    // Check if registration number exists for THIS user only
+    const alumniExists = await Alumni.findOne({ 
+      registrationNumber, 
+      createdBy: req.user.id 
+    })
 
     if (alumniExists) {
       return res.status(400).json({ message: "Alumni with this registration number already exists" })
@@ -94,6 +104,7 @@ export const createAlumni = async (req, res) => {
       employment,
       higherEducation,
       contactDetails,
+      createdBy: req.user.id, // Link to current user
     })
 
     if (alumni) {
@@ -109,10 +120,14 @@ export const createAlumni = async (req, res) => {
 
 // @desc    Update an alumni
 // @route   PUT /api/alumni/:id
-// @access  Private/Admin
+// @access  Private
 export const updateAlumni = async (req, res) => {
   try {
-    const alumni = await Alumni.findById(req.params.id)
+    // Only allow user to update their own alumni records
+    const alumni = await Alumni.findOne({ 
+      _id: req.params.id, 
+      createdBy: req.user.id 
+    })
 
     if (alumni) {
       alumni.name = req.body.name || alumni.name
@@ -150,10 +165,14 @@ export const updateAlumni = async (req, res) => {
 
 // @desc    Delete an alumni
 // @route   DELETE /api/alumni/:id
-// @access  Private/Admin
+// @access  Private
 export const deleteAlumni = async (req, res) => {
   try {
-    const alumni = await Alumni.findById(req.params.id)
+    // Only allow user to delete their own alumni records
+    const alumni = await Alumni.findOne({ 
+      _id: req.params.id, 
+      createdBy: req.user.id 
+    })
 
     if (alumni) {
       await alumni.deleteOne()
@@ -169,12 +188,13 @@ export const deleteAlumni = async (req, res) => {
 
 // @desc    Search alumni
 // @route   GET /api/alumni/search
-// @access  Private/Admin
+// @access  Private
 export const searchAlumni = async (req, res) => {
   try {
     const { query, academicUnit } = req.query
 
     const filter = {
+      createdBy: req.user.id, // Only search user's own data
       $or: [
         { name: { $regex: query, $options: "i" } },
         { registrationNumber: { $regex: query, $options: "i" } },
@@ -197,14 +217,24 @@ export const searchAlumni = async (req, res) => {
 
 // @desc    Get alumni statistics
 // @route   GET /api/alumni/stats
-// @access  Private/Admin
+// @access  Private
 export const getAlumniStats = async (req, res) => {
   try {
-    // Total alumni count
-    const totalAlumni = await Alumni.countDocuments()
+    console.log("=== GET ALUMNI STATS ===")
+    console.log("Current user ID:", req.user.id)
+    console.log("User ID type:", typeof req.user.id)
+    
+    // Convert user ID to ObjectId for ALL queries (aggregate AND countDocuments)
+    const userObjectId = new mongoose.Types.ObjectId(req.user.id)
+    console.log("Converted to ObjectId:", userObjectId)
+    
+    // Total alumni count for current user - USE ObjectId
+    const totalAlumni = await Alumni.countDocuments({ createdBy: userObjectId })
+    console.log("Total alumni for this user:", totalAlumni)
 
-    // Count by academic unit
+    // Count by academic unit (user-specific) - USING ObjectId
     const byAcademicUnit = await Alumni.aggregate([
+      { $match: { createdBy: userObjectId } },
       {
         $group: {
           _id: "$academicUnit",
@@ -212,6 +242,7 @@ export const getAlumniStats = async (req, res) => {
         },
       },
     ])
+    console.log("Academic unit aggregation result:", byAcademicUnit)
 
     // Format academic unit data
     const academicUnitData = {}
@@ -219,8 +250,9 @@ export const getAlumniStats = async (req, res) => {
       academicUnitData[item._id] = item.count
     })
 
-    // Count by passing year
+    // Count by passing year (user-specific) - USING ObjectId
     const byPassingYear = await Alumni.aggregate([
+      { $match: { createdBy: userObjectId } },
       {
         $group: {
           _id: "$passingYear",
@@ -231,6 +263,7 @@ export const getAlumniStats = async (req, res) => {
         $sort: { _id: 1 },
       },
     ])
+    console.log("Passing year aggregation result:", byPassingYear)
 
     // Format passing year data
     const passingYearData = {}
@@ -238,29 +271,37 @@ export const getAlumniStats = async (req, res) => {
       passingYearData[item._id] = item.count
     })
 
-    // Count employed alumni
+    // Count employed alumni (user-specific) - USE ObjectId
     const employedCount = await Alumni.countDocuments({
+      createdBy: userObjectId,
       "employment.type": "Employed",
     })
+    console.log("Employed count:", employedCount)
 
     // Calculate employment rate
     const employmentRate = totalAlumni > 0 ? Math.round((employedCount / totalAlumni) * 100) : 0
 
-    // Count alumni pursuing higher education
+    // Count alumni pursuing higher education (user-specific) - USE ObjectId
     const higherEducationCount = await Alumni.countDocuments({
+      createdBy: userObjectId,
       "higherEducation.institutionName": { $exists: true, $ne: "" },
     })
+    console.log("Higher education count:", higherEducationCount)
 
     // Calculate higher education rate
     const higherEducationRate = totalAlumni > 0 ? Math.round((higherEducationCount / totalAlumni) * 100) : 0
 
-    res.json({
+    const response = {
       totalAlumni,
       byAcademicUnit: academicUnitData,
       byPassingYear: passingYearData,
       employmentRate,
       higherEducationRate,
-    })
+    }
+    console.log("Final response:", response)
+    console.log("======================")
+
+    res.json(response)
   } catch (error) {
     console.error("Get alumni stats error:", error)
     res.status(500).json({ message: "Server error fetching alumni statistics" })

@@ -7,10 +7,11 @@ const router = express.Router()
 
 // @route   GET /api/academic-units
 // @desc    Get all academic units
-// @access  Public
-router.get("/", async (req, res) => {
+// @access  Private
+router.get("/", protect, async (req, res) => {
   try {
-    const academicUnits = await AcademicUnit.find().sort({ name: 1 })
+    // Only get academic units created by the current user
+    const academicUnits = await AcademicUnit.find({ createdBy: req.user.id }).sort({ name: 1 })
     res.json(academicUnits)
   } catch (error) {
     console.error("Error fetching academic units:", error)
@@ -20,10 +21,14 @@ router.get("/", async (req, res) => {
 
 // @route   GET /api/academic-units/:id
 // @desc    Get academic unit by ID
-// @access  Public
-router.get("/:id", async (req, res) => {
+// @access  Private
+router.get("/:id", protect, async (req, res) => {
   try {
-    const academicUnit = await AcademicUnit.findById(req.params.id)
+    // Only allow user to access their own academic units
+    const academicUnit = await AcademicUnit.findOne({ 
+      _id: req.params.id, 
+      createdBy: req.user.id 
+    })
 
     if (!academicUnit) {
       return res.status(404).json({ message: "Academic unit not found" })
@@ -58,8 +63,11 @@ router.post(
     }
 
     try {
-      // Check if academic unit with same name already exists
-      const existingUnit = await AcademicUnit.findOne({ name: req.body.name })
+      // Check if academic unit with same name already exists for THIS user
+      const existingUnit = await AcademicUnit.findOne({ 
+        name: req.body.name, 
+        createdBy: req.user.id 
+      })
 
       if (existingUnit) {
         return res.status(400).json({ message: "Academic unit with this name already exists" })
@@ -70,6 +78,7 @@ router.post(
         name: req.body.name,
         shortName: req.body.shortName,
         description: req.body.description,
+        createdBy: req.user.id, // Link to current user
       })
 
       // Save to database
@@ -88,16 +97,22 @@ router.post(
 // @access  Private
 router.put("/:id", protect, async (req, res) => {
   try {
-    // Find academic unit
-    let academicUnit = await AcademicUnit.findById(req.params.id)
+    // Find academic unit - only user's own records
+    let academicUnit = await AcademicUnit.findOne({ 
+      _id: req.params.id, 
+      createdBy: req.user.id 
+    })
 
     if (!academicUnit) {
       return res.status(404).json({ message: "Academic unit not found" })
     }
 
-    // Check if updating name and it already exists
+    // Check if updating name and it already exists for THIS user
     if (req.body.name && req.body.name !== academicUnit.name) {
-      const existingUnit = await AcademicUnit.findOne({ name: req.body.name })
+      const existingUnit = await AcademicUnit.findOne({ 
+        name: req.body.name, 
+        createdBy: req.user.id 
+      })
 
       if (existingUnit) {
         return res.status(400).json({ message: "Academic unit with this name already exists" })
@@ -112,8 +127,12 @@ router.put("/:id", protect, async (req, res) => {
       updatedAt: Date.now(),
     }
 
-    // Update academic unit
-    academicUnit = await AcademicUnit.findByIdAndUpdate(req.params.id, updateFields, { new: true })
+    // Update academic unit - only user's own records
+    academicUnit = await AcademicUnit.findOneAndUpdate(
+      { _id: req.params.id, createdBy: req.user.id }, 
+      updateFields, 
+      { new: true }
+    )
 
     res.json(academicUnit)
   } catch (error) {
@@ -132,15 +151,21 @@ router.put("/:id", protect, async (req, res) => {
 // @access  Private
 router.delete("/:id", protect, async (req, res) => {
   try {
-    // Find academic unit
-    const academicUnit = await AcademicUnit.findById(req.params.id)
+    // Find academic unit - only user's own records
+    const academicUnit = await AcademicUnit.findOne({ 
+      _id: req.params.id, 
+      createdBy: req.user.id 
+    })
 
     if (!academicUnit) {
       return res.status(404).json({ message: "Academic unit not found" })
     }
 
-    // Delete academic unit
-    await AcademicUnit.deleteOne({ _id: req.params.id })
+    // Delete academic unit - only user's own records
+    await AcademicUnit.deleteOne({ 
+      _id: req.params.id, 
+      createdBy: req.user.id 
+    })
 
     res.json({ message: "Academic unit removed" })
   } catch (error) {

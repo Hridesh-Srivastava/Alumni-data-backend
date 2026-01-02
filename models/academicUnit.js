@@ -4,7 +4,6 @@ const AcademicUnitSchema = new mongoose.Schema({
   name: {
     type: String,
     required: true,
-    unique: true,
   },
   shortName: {
     type: String,
@@ -12,6 +11,11 @@ const AcademicUnitSchema = new mongoose.Schema({
   },
   description: {
     type: String,
+  },
+  createdBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "User",
+    required: true,
   },
   createdAt: {
     type: Date,
@@ -21,6 +25,9 @@ const AcademicUnitSchema = new mongoose.Schema({
     type: Date,
   },
 })
+
+// Create a compound index for unique name per user
+AcademicUnitSchema.index({ name: 1, createdBy: 1 }, { unique: true })
 
 const AcademicUnit = mongoose.model("AcademicUnit", AcademicUnitSchema)
 

@@ -3,6 +3,7 @@ import { check, validationResult } from "express-validator"
 import multer from "multer"
 import { v2 as cloudinary } from "cloudinary"
 import { CloudinaryStorage } from "multer-storage-cloudinary"
+import mongoose from "mongoose"
 import auth from "../middleware/auth.js"
 import Alumni from "../models/alumni.js"
 
@@ -40,11 +41,11 @@ const router = express.Router()
 
 // @route   GET /api/alumni/programs
 // @desc    Get all available programs
-// @access  Public
-router.get("/programs", async (req, res) => {
+// @access  Private
+router.get("/programs", auth.protect, async (req, res) => {
   try {
-    // Get distinct programs from the database
-    const programs = await Alumni.distinct("program")
+    // Get distinct programs from the database for the current user
+    const programs = await Alumni.distinct("program", { createdBy: req.user.id })
     
     // Sort alphabetically
     const sortedPrograms = programs.sort()
@@ -63,11 +64,11 @@ router.get("/programs", async (req, res) => {
 
 // @route   GET /api/alumni/passing-years
 // @desc    Get all available passing years
-// @access  Public
-router.get("/passing-years", async (req, res) => {
+// @access  Private
+router.get("/passing-years", auth.protect, async (req, res) => {
   try {
-    // Get distinct passing years from the database
-    const passingYears = await Alumni.distinct("passingYear")
+    // Get distinct passing years from the database for the current user
+    const passingYears = await Alumni.distinct("passingYear", { createdBy: req.user.id })
     
     // Sort in descending order (newest first)
     const sortedYears = passingYears.sort((a, b) => {
@@ -90,15 +91,15 @@ router.get("/passing-years", async (req, res) => {
 
 // @route   GET /api/alumni
 // @desc    Get all alumni with pagination and filters
-// @access  Public
-router.get("/", async (req, res) => {
+// @access  Private
+router.get("/", auth.protect, async (req, res) => {
   try {
     const page = Number.parseInt(req.query.page) || 1
     const limit = Math.min(Number.parseInt(req.query.limit) || 10, 100) // Maximum 100 records per page
     const skip = (page - 1) * limit
 
-    // Build filter object
-    const filter = {}
+    // Build filter object - always filter by current user
+    const filter = { createdBy: req.user.id }
 
     // Handle academic unit filter
     if (req.query.academicUnit && req.query.academicUnit !== "all") {
@@ -153,8 +154,8 @@ router.get("/search", auth.protect, async (req, res) => {
     const limit = Math.min(Number.parseInt(req.query.limit) || 10, 100) // Maximum 100 records per page
     const skip = (page - 1) * limit
 
-    // Build search filter
-    const filter = {}
+    // Build search filter - always filter by current user
+    const filter = { createdBy: req.user.id }
 
     // Handle academic unit filter
     if (req.query.academicUnit && req.query.academicUnit !== "all") {
@@ -198,44 +199,47 @@ router.get("/search", auth.protect, async (req, res) => {
 
 // @route   GET /api/alumni/stats
 // @desc    Get alumni statistics
-// @access  Public
+// @access  Private
 // IMPORTANT: This route must be defined BEFORE the /:id route to prevent MongoDB from trying to cast "stats" as an ObjectId
-router.get("/stats", async (req, res) => {
+router.get("/stats", auth.protect, async (req, res) => {
   try {
     console.log("Fetching alumni statistics...")
+    
+    // Convert user ID to ObjectId for ALL queries
+    const userObjectId = new mongoose.Types.ObjectId(req.user.id)
+    console.log("User ID:", req.user.id, "-> ObjectId:", userObjectId)
 
-    // No filter - get statistics for all academic units
-    const filter = {}
-
-    // Get total alumni count
-    const totalAlumni = await Alumni.countDocuments(filter)
+    // Get total alumni count - USE ObjectId
+    const totalAlumni = await Alumni.countDocuments({ createdBy: userObjectId })
     console.log(`Total alumni: ${totalAlumni}`)
 
-    // Get alumni count by academic unit
+    // Get alumni count by academic unit - USE ObjectId
     const byAcademicUnitResult = await Alumni.aggregate([
-      { $match: filter },
+      { $match: { createdBy: userObjectId } },
       { $group: { _id: "$academicUnit", count: { $sum: 1 } } },
       { $sort: { _id: 1 } },
     ])
+    console.log("Academic unit results:", byAcademicUnitResult)
 
-    // Get alumni count by passing year
+    // Get alumni count by passing year - USE ObjectId
     const byPassingYearResult = await Alumni.aggregate([
-      { $match: filter },
+      { $match: { createdBy: userObjectId } },
       { $group: { _id: "$passingYear", count: { $sum: 1 } } },
       { $sort: { _id: 1 } },
     ])
+    console.log("Passing year results:", byPassingYearResult)
 
-    // Get employment rate
+    // Get employment rate - USE ObjectId
     const employedCount = await Alumni.countDocuments({
-      ...filter,
+      createdBy: userObjectId,
       "employment.type": "Employed",
     })
 
     const employmentRate = totalAlumni > 0 ? Math.round((employedCount / totalAlumni) * 100) : 0
 
-    // Get higher education rate
+    // Get higher education rate - USE ObjectId
     const higherEducationCount = await Alumni.countDocuments({
-      ...filter,
+      createdBy: userObjectId,
       "higherEducation.institutionName": { $exists: true, $ne: "" },
     })
 
@@ -277,7 +281,11 @@ router.get("/stats", async (req, res) => {
 // @access  Private
 router.get("/:id", auth.protect, async (req, res) => {
   try {
-    const alumni = await Alumni.findById(req.params.id)
+    // Only allow user to access their own alumni records
+    const alumni = await Alumni.findOne({ 
+      _id: req.params.id, 
+      createdBy: req.user.id 
+    })
 
     if (!alumni) {
       return res.status(404).json({ message: "Alumni not found" })
@@ -307,6 +315,7 @@ router.post(
     check("program", "Program is required").not().isEmpty(),
     check("passingYear", "Passing year is required").not().isEmpty(),
     check("registrationNumber", "Registration number is required").not().isEmpty(),
+    check("academicUnit", "Academic unit is required").not().isEmpty(),
   ],
   async (req, res) => {
     // Check for validation errors
@@ -360,8 +369,11 @@ router.post(
         }
       }
 
-      // Check if alumni with same registration number already exists
-      const existingAlumni = await Alumni.findOne({ registrationNumber: req.body.registrationNumber })
+      // Check if alumni with same registration number already exists for THIS user
+      const existingAlumni = await Alumni.findOne({ 
+        registrationNumber: req.body.registrationNumber, 
+        createdBy: req.user.id 
+      })
 
       if (existingAlumni) {
         return res.status(400).json({ message: "Alumni with this registration number already exists" })
@@ -380,7 +392,7 @@ router.post(
       // Create new alumni
       const newAlumni = new Alumni({
         name: req.body.name,
-        academicUnit: "School of Science and Technology", // Always set to SST
+        academicUnit: req.body.academicUnit, // User selected academic unit
         program: req.body.program,
         passingYear: req.body.passingYear,
         registrationNumber: req.body.registrationNumber,
@@ -420,16 +432,22 @@ router.post(
 // @access  Private
 router.put("/:id", [auth.protect, uploadFiles], async (req, res) => {
   try {
-    // Find alumni
-    let alumni = await Alumni.findById(req.params.id)
+    // Find alumni - only user's own records
+    let alumni = await Alumni.findOne({ 
+      _id: req.params.id, 
+      createdBy: req.user.id 
+    })
 
     if (!alumni) {
       return res.status(404).json({ message: "Alumni not found" })
     }
 
-    // Check if updating registration number and it already exists
+    // Check if updating registration number and it already exists for THIS user
     if (req.body.registrationNumber && req.body.registrationNumber !== alumni.registrationNumber) {
-      const existingAlumni = await Alumni.findOne({ registrationNumber: req.body.registrationNumber })
+      const existingAlumni = await Alumni.findOne({ 
+        registrationNumber: req.body.registrationNumber, 
+        createdBy: req.user.id 
+      })
 
       if (existingAlumni) {
         return res.status(400).json({ message: "Alumni with this registration number already exists" })
@@ -489,7 +507,7 @@ router.put("/:id", [auth.protect, uploadFiles], async (req, res) => {
     // Update fields
     const updateFields = {
       name: req.body.name || alumni.name,
-      academicUnit: "School of Science and Technology", // Always set to SST
+      academicUnit: req.body.academicUnit || alumni.academicUnit, // Update if provided
       program: req.body.program || alumni.program,
       passingYear: req.body.passingYear || alumni.passingYear,
       registrationNumber: req.body.registrationNumber || alumni.registrationNumber,
@@ -515,8 +533,12 @@ router.put("/:id", [auth.protect, uploadFiles], async (req, res) => {
       updatedAt: Date.now(),
     }
 
-    // Update alumni
-    alumni = await Alumni.findByIdAndUpdate(req.params.id, updateFields, { new: true })
+    // Update alumni - only user's own records
+    alumni = await Alumni.findOneAndUpdate(
+      { _id: req.params.id, createdBy: req.user.id }, 
+      updateFields, 
+      { new: true }
+    )
 
     res.json(alumni)
   } catch (error) {
@@ -533,7 +555,7 @@ router.put("/:id", [auth.protect, uploadFiles], async (req, res) => {
 // @route   DELETE /api/alumni/bulk
 // @desc    Delete multiple alumni
 // @access  Private
-router.delete("/bulk", auth.protect, auth.admin, async (req, res) => {
+router.delete("/bulk", auth.protect, async (req, res) => {
   try {
     console.log("Bulk delete request received")
     console.log("User making request:", req.user)
@@ -548,8 +570,11 @@ router.delete("/bulk", auth.protect, auth.admin, async (req, res) => {
 
     console.log("Attempting to delete alumni IDs:", ids)
 
-    // Delete multiple alumni
-    const result = await Alumni.deleteMany({ _id: { $in: ids } })
+    // Delete multiple alumni - only user's own records
+    const result = await Alumni.deleteMany({ 
+      _id: { $in: ids }, 
+      createdBy: req.user.id 
+    })
     console.log("Bulk delete result:", result)
 
     if (result.deletedCount === 0) {
@@ -571,13 +596,16 @@ router.delete("/bulk", auth.protect, auth.admin, async (req, res) => {
 // @route   DELETE /api/alumni/:id
 // @desc    Delete alumni
 // @access  Private
-router.delete("/:id", auth.protect, auth.admin, async (req, res) => {
+router.delete("/:id", auth.protect, async (req, res) => {
   try {
     console.log("Delete alumni request received for ID:", req.params.id)
     console.log("User making request:", req.user)
     
-    // Find alumni
-    const alumni = await Alumni.findById(req.params.id)
+    // Find alumni - only user's own records
+    const alumni = await Alumni.findOne({ 
+      _id: req.params.id, 
+      createdBy: req.user.id 
+    })
 
     if (!alumni) {
       console.log("Alumni not found with ID:", req.params.id)
@@ -586,8 +614,11 @@ router.delete("/:id", auth.protect, auth.admin, async (req, res) => {
 
     console.log("Found alumni:", alumni.name)
 
-    // Delete alumni
-    const deleteResult = await Alumni.deleteOne({ _id: req.params.id })
+    // Delete alumni - only user's own records
+    const deleteResult = await Alumni.deleteOne({ 
+      _id: req.params.id, 
+      createdBy: req.user.id 
+    })
     console.log("Delete result:", deleteResult)
 
     res.json({ message: "Alumni removed" })
